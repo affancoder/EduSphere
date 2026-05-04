@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, 
@@ -8,71 +8,93 @@ import {
   Eye, 
   CheckCircle2, 
   Filter,
-  Inbox
+  Inbox,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "../../components/Footer";
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 
-const initialDoubts = [
-  {
-    id: 1,
-    question: "What is closure?",
-    answer: "Closure is a function that remembers variables from its outer scope even after the outer function has finished executing.",
-    status: "understood",
-    subject: "JavaScript",
-    date: "May 2, 2026",
-  },
-  {
-    id: 2,
-    question: "Difference between SQL and NoSQL?",
-    answer: "SQL is relational and table-based, while NoSQL is non-relational and can be document-based, key-value, etc.",
-    status: "pending",
-    subject: "Databases",
-    date: "May 1, 2026",
-  },
-];
-
 interface Doubt {
-  id: number;
+  _id: string;
   question: string;
-  answer: string;
-  status: string;
-  subject: string;
-  date: string;
+  subject?: string;
+  explanation?: string;
+  example?: string;
+  quiz?: string[];
+  status: "pending" | "understood";
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function HistoryPage() {
-  const [doubts, setDoubts] = useState<Doubt[]>(initialDoubts);
+  const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // TODO: Fetch from API
-  // useEffect(() => { fetchDoubts() }, [])
+  const fetchDoubts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/doubts");
+      const data = await res.json();
+      if (res.ok) {
+        setDoubts(data);
+      } else {
+        setError(data.error || "Failed to load your history.");
+      }
+    } catch (err) {
+      console.error("Fetch history error:", err);
+      setError("An error occurred while loading your history.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDoubts();
+  }, [fetchDoubts]);
 
   const handleView = (doubt: Doubt) => {
-    console.log("Viewing doubt:", doubt);
-    alert(`Viewing: ${doubt.question}\n\nAnswer: ${doubt.answer}`);
+    alert(`Question: ${doubt.question}\n\nExplanation: ${doubt.explanation || "No explanation yet."}`);
   };
 
-  const handleDelete = (id: number) => {
-    // TODO: Delete via API
-    setDoubts(doubts.filter((d) => d.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this doubt?")) return;
+    try {
+      const res = await fetch(`/api/doubts/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDoubts((prev) => prev.filter((d) => d._id !== id));
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
   };
 
-  const handleToggleStatus = (id: number) => {
-    // TODO: Update status via API
-    setDoubts(
-      doubts.map((d) =>
-        d.id === id
-          ? { ...d, status: d.status === "understood" ? "pending" : "understood" }
-          : d
-      )
-    );
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === "understood" ? "pending" : "understood";
+    try {
+      const res = await fetch(`/api/doubts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setDoubts((prev) =>
+          prev.map((d) => (d._id === id ? { ...d, status: newStatus as "pending" | "understood" } : d))
+        );
+      }
+    } catch (err) {
+      console.error("Status toggle error:", err);
+    }
   };
 
   const filteredDoubts = doubts.filter((d) =>
-    d.question.toLowerCase().includes(searchTerm.toLowerCase())
+    d.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (d.subject && d.subject.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -113,10 +135,26 @@ export default function HistoryPage() {
         {/* Doubts List */}
         <div className="space-y-4">
           <AnimatePresence mode="popLayout">
-            {filteredDoubts.length > 0 ? (
+            {loading ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-4">
+                <Loader2 className="w-10 h-10 text-[#d4af37] animate-spin" />
+                <p className="text-text-muted text-sm animate-pulse">Loading your history...</p>
+              </div>
+            ) : error ? (
+              <div className="py-20 flex flex-col items-center justify-center text-center gap-4">
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-full">
+                  <AlertCircle className="w-10 h-10 text-red-500" />
+                </div>
+                <h3 className="font-display text-3xl text-text-primary">Oops!</h3>
+                <p className="text-text-muted max-w-xs">{error}</p>
+                <GoldButton onClick={fetchDoubts} variant="ghost" className="mt-4 border-white/10 text-text-primary">
+                  Try Again
+                </GoldButton>
+              </div>
+            ) : filteredDoubts.length > 0 ? (
               filteredDoubts.map((doubt) => (
                 <motion.div
-                  key={doubt.id}
+                  key={doubt._id}
                   layout
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -128,16 +166,24 @@ export default function HistoryPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-lg bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/20 font-semibold">
-                            {doubt.subject}
+                            {doubt.subject || "General"}
                           </span>
-                          <span className="text-xs text-text-muted">{doubt.date}</span>
+                          <span className="text-xs text-text-muted">
+                            {new Date(doubt.createdAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
                         </div>
                         <h3 className="font-display text-2xl text-text-primary mb-2 group-hover:text-[#d4af37] transition-colors">
                           {doubt.question}
                         </h3>
-                        <p className="text-sm text-text-muted line-clamp-1 max-w-2xl italic">
-                          &ldquo;{doubt.answer}&rdquo;
-                        </p>
+                        {doubt.explanation && (
+                          <p className="text-sm text-text-muted line-clamp-1 max-w-2xl italic">
+                            &ldquo;{doubt.explanation}&rdquo;
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between lg:justify-end gap-4 border-t lg:border-t-0 border-white/5 pt-4 lg:pt-0">
@@ -157,14 +203,14 @@ export default function HistoryPage() {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handleToggleStatus(doubt.id)}
+                            onClick={() => handleToggleStatus(doubt._id, doubt.status)}
                             className={`p-2 rounded-xl bg-white/5 border border-white/5 transition-all ${doubt.status === 'understood' ? 'text-emerald-500 hover:bg-emerald-500/5' : 'text-text-muted hover:text-emerald-500 hover:bg-emerald-500/5'}`} 
                             title={doubt.status === 'understood' ? "Mark as Pending" : "Mark as Understood"}
                           >
                             <CheckCircle2 className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handleDelete(doubt.id)}
+                            onClick={() => handleDelete(doubt._id)}
                             className="p-2 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:text-red-500 hover:bg-red-500/5 transition-all" 
                             title="Delete"
                           >
