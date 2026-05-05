@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import GoldButton from "../ui/GoldButton";
 
 interface Course {
@@ -91,10 +92,11 @@ export default function CoursesSection() {
               >
                 <Link href={`/course/${course._id}`}>
                   <div className="relative aspect-4/5 overflow-hidden rounded-2xl mb-6">
-                    <img
+                    <Image
                       src={course.thumbnail || "https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?q=80&w=800&auto=format&fit=crop"}
                       alt={course.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-linear-to-t from-background/90 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
                     <div className="absolute top-4 left-4">
@@ -106,7 +108,7 @@ export default function CoursesSection() {
                   <h3 className="font-display text-2xl text-text-primary mb-2 group-hover:text-gold transition-colors">
                     {course.title}
                   </h3>
-                  <p className="font-body text-gold/80 text-lg uppercase tracking-widest text-xs font-bold">{course.level}</p>
+                  <p className="font-body text-gold/80 uppercase tracking-widest text-xs font-bold">{course.level}</p>
                 </Link>
               </motion.div>
             ))}

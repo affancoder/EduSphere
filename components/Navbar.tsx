@@ -9,9 +9,9 @@ import GoldButton from "./ui/GoldButton";
 
 const navLinks = [
   { name: "Courses", href: "/courses" },
+  { name: "AI Hub", href: "/learning-hub" },
   { name: "Mentors", href: "/mentors" },
   { name: "Community", href: "/community" },
-  { name: "Pricing", href: "/pricing" },
 ];
 
 export default function Navbar() {

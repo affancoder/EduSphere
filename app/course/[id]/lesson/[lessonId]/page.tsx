@@ -29,10 +29,13 @@ export default function LessonPage() {
   const router = useRouter();
   const params = useParams();
   const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [course, setCourse] = useState<Course | null>(null);
   const [totalLessons, setTotalLessons] = useState(0);
   const [prevLessonId, setPrevLessonId] = useState<string | null>(null);
   const [nextLessonId, setNextLessonId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchLesson = async () => {
@@ -41,7 +44,6 @@ export default function LessonPage() {
         const data = await res.json();
         if (data.success) {
           setLesson(data.lesson);
-          setCourse({ _id: params.id as string, title: data.courseTitle });
           setIsCompleted(data.lesson.isCompleted);
           setTotalLessons(data.totalLessons);
           setPrevLessonId(data.prevLessonId);
@@ -49,8 +51,8 @@ export default function LessonPage() {
         } else {
           setError(data.error || "Failed to load lesson");
         }
-      } catch (error) {
-        console.error("Failed to fetch lesson:", error);
+      } catch (err: unknown) {
+        console.error("Failed to fetch lesson:", err);
         setError("Network error. Please try again.");
       } finally {
         setLoading(false);

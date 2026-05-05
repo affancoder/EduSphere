@@ -10,14 +10,15 @@ import {
   Flame, 
   Clock, 
   TrendingUp, 
-  Search, 
   CheckCircle2,
   Circle,
   BookOpen,
   ArrowRight,
-  MessageSquare,
   Send,
-  History
+  History,
+  BrainCircuit,
+  Sparkles,
+  Target
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -72,8 +73,16 @@ interface Doubt {
   _id: string;
   question: string;
   answer: string;
+  topic?: string;
   subject: string;
   createdAt: string;
+}
+
+interface Roadmap {
+  _id: string;
+  goal: string;
+  topics: { title: string; isCompleted: boolean }[];
+  status: string;
 }
 
 export default function DashboardPage() {
@@ -83,8 +92,8 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [doubts, setDoubts] = useState<Doubt[]>([]);
+  const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   // Doubt State
@@ -94,12 +103,13 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [userRes, coursesRes, historyRes, progressRes, doubtsRes] = await Promise.all([
+        const [userRes, coursesRes, historyRes, progressRes, doubtsRes, roadmapsRes] = await Promise.all([
           fetch("/api/auth/me"),
           fetch("/api/courses"),
           fetch("/api/history"),
           fetch("/api/progress"),
-          fetch("/api/doubts")
+          fetch("/api/ai/history"),
+          fetch("/api/roadmap/list")
         ]);
 
         const userData = await userRes.json();
@@ -107,12 +117,14 @@ export default function DashboardPage() {
         const historyData = await historyRes.json();
         const progressData = await progressRes.json();
         const doubtsData = await doubtsRes.json();
+        const roadmapsData = await roadmapsRes.json();
 
         if (userRes.ok) setUser(userData.user);
         if (coursesData.success) setCourses(coursesData.courses || []);
         if (historyRes.ok) setHistory(historyData.history || []);
         if (progressRes.ok) setProgress(progressData.progress || []);
-        if (doubtsRes.ok) setDoubts(doubtsData.doubts || []);
+        if (doubtsData.success) setDoubts(doubtsData.history || []);
+        if (roadmapsData.success) setRoadmaps(roadmapsData.roadmaps || []);
 
         if (!userRes.ok) router.push("/login");
       } catch (err) {
@@ -125,16 +137,22 @@ export default function DashboardPage() {
     fetchData();
   }, [router]);
 
-  const handleAskDoubt = async (e: React.FormEvent) => {
+  const masteredTopics = useMemo(() => {
+    const roadmapTopics = roadmaps.flatMap(r => r.topics.filter(t => t.isCompleted).map(t => t.title));
+    const doubtTopics = doubts.filter(d => d.topic).map(d => d.topic!);
+    return Array.from(new Set([...roadmapTopics, ...doubtTopics]));
+  }, [roadmaps, doubts]);
+
+  const handleAskDoubt = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newQuestion.trim()) return;
 
     try {
       setAskingDoubt(true);
-      const res = await fetch("/api/doubts", {
+      const res = await fetch("/api/ai/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: newQuestion, subject: "General" }),
+        body: JSON.stringify({ question: newQuestion }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -162,11 +180,10 @@ export default function DashboardPage() {
 
   const filteredHistory = useMemo(() => {
     return history.filter(item => {
-      const matchesSearch = (item.courseName || "").toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = statusFilter === "all" || item.completionStatus === statusFilter;
-      return matchesSearch && matchesFilter;
+      return matchesFilter;
     });
-  }, [history, searchTerm, statusFilter]);
+  }, [history, statusFilter]);
 
   const totalProgress = useMemo(() => {
     return progress.length > 0 
@@ -177,6 +194,20 @@ export default function DashboardPage() {
   const totalLearningTime = useMemo(() => {
     return history.reduce((acc, curr) => acc + (Number(curr.timeSpent) || 0), 0);
   }, [history]);
+
+  const learningScore = useMemo(() => {
+    // Formula for Intelligence Score (0-100)
+    // 1. Questions Factor (up to 30 points) - 3 points per doubt
+    const questionsPoints = Math.min(30, doubts.length * 3);
+    
+    // 2. Topics Factor (up to 40 points) - 5 points per unique mastered topic
+    const topicsPoints = Math.min(40, masteredTopics.length * 5);
+    
+    // 3. Activity Factor (up to 30 points) - 2 points per lesson/history item
+    const activityPoints = Math.min(30, history.length * 2);
+    
+    return questionsPoints + topicsPoints + activityPoints;
+  }, [doubts, masteredTopics, history]);
 
   if (loading) {
     return (
@@ -219,16 +250,178 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          {/* Available Courses */}
+          {/* Intelligence Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-12">
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-gold shadow-[0_0_10px_rgba(201,168,76,0.5)]" />
+              <div className="flex-1">
+                <p className="text-gold text-[10px] uppercase tracking-widest font-bold mb-1">Intelligence Score</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-display text-text-primary">{learningScore}</span>
+                  <span className="text-text-muted text-xs">/100</span>
+                </div>
+              </div>
+              <div className="p-2 bg-gold/10 rounded-lg text-gold">
+                <BrainCircuit className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              </div>
+            </Card>
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+              <div className="p-3 bg-orange-500/10 rounded-xl text-orange-500">
+                <Flame className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-text-muted text-[10px] uppercase tracking-widest font-bold">Streak</p>
+                <p className="text-2xl font-display">{user?.streak || 0} Days</p>
+              </div>
+            </Card>
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+              <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-text-muted text-[10px] uppercase tracking-widest font-bold">Time</p>
+                <p className="text-2xl font-display">{totalLearningTime}m</p>
+              </div>
+            </Card>
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+              <div className="p-3 bg-gold/10 rounded-xl text-gold">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-text-muted text-[10px] uppercase tracking-widest font-bold">Progress</p>
+                <p className="text-2xl font-display">{totalProgress}%</p>
+              </div>
+            </Card>
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+              <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
+                <Target className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-text-muted text-[10px] uppercase tracking-widest font-bold">Nodes</p>
+                <p className="text-2xl font-display">{masteredTopics.length}</p>
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-12">
+            {/* AI Brain - Mastered Topics */}
+            <div className="lg:col-span-1">
+              <h2 className="font-display text-3xl text-text-primary mb-6 flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-gold" />
+                AI <span className="text-gold italic">Brain</span>
+              </h2>
+              <Card className="p-8 bg-surface border-border-gold h-full">
+                <p className="text-xs font-bold text-gold uppercase tracking-widest mb-6">Knowledge Nodes</p>
+                <div className="flex flex-wrap gap-3">
+                  {masteredTopics.length > 0 ? (
+                    masteredTopics.map((topic, idx) => (
+                      <motion.span
+                        key={idx}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="px-3 py-1.5 rounded-full bg-gold/5 border border-gold/20 text-[10px] text-text-primary uppercase tracking-wider font-medium hover:bg-gold/10 transition-colors"
+                      >
+                        {topic}
+                      </motion.span>
+                    ))
+                  ) : (
+                    <p className="text-text-muted text-sm italic">No topics mastered yet. Complete AI roadmap steps to expand your brain.</p>
+                  )}
+                </div>
+                
+                {roadmaps.length > 0 && (
+                  <div className="mt-12 pt-12 border-t border-border-gold/20">
+                    <p className="text-xs font-bold text-gold uppercase tracking-widest mb-6">Active Paths</p>
+                    <div className="space-y-4">
+                      {roadmaps.slice(0, 3).map((r) => (
+                        <div key={r._id} className="cursor-pointer group" onClick={() => router.push(`/learning-hub/roadmap/${r._id}`)}>
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="text-xs font-medium text-text-primary group-hover:text-gold transition-colors truncate pr-4">{r.goal}</p>
+                            <ArrowRight className="w-3 h-3 text-gold opacity-0 group-hover:opacity-100 transition-all" />
+                          </div>
+                          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gold" 
+                              style={{ width: `${(r.topics.filter(t => t.isCompleted).length / r.topics.length) * 100}%` }} 
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+            {/* AI Interaction - Feed */}
+            <div className="lg:col-span-2">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display text-3xl text-text-primary flex items-center gap-2">
+                  <History className="w-6 h-6 text-gold" />
+                  Brain <span className="text-gold italic">Feed</span>
+                </h2>
+                <GoldButton variant="ghost" className="text-xs" onClick={() => router.push('/learning-hub')}>
+                  Research New Topic
+                </GoldButton>
+              </div>
+              <div className="space-y-6">
+                <Card className="p-6 bg-surface border-border-gold">
+                  <form onSubmit={handleAskDoubt} className="flex gap-4">
+                    <input
+                      value={newQuestion}
+                      onChange={(e) => setNewQuestion(e.target.value)}
+                      placeholder="Ask your brain anything..."
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-gold/50 transition-colors"
+                      required
+                    />
+                    <GoldButton variant="filled" disabled={askingDoubt} className="px-6">
+                      {askingDoubt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </GoldButton>
+                  </form>
+                </Card>
+
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gold/20">
+                  {doubts.length > 0 ? (
+                    doubts.map((doubt) => (
+                      <motion.div
+                        key={doubt._id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                      >
+                        <Card className="p-6 bg-surface border-border-gold/30 hover:border-gold/50 transition-all group">
+                          <div className="flex justify-between items-start mb-3">
+                            <span className="px-2 py-0.5 rounded bg-gold/10 border border-gold/20 text-[8px] uppercase tracking-widest font-bold text-gold">
+                              {doubt.topic || "Insight"}
+                            </span>
+                            <span className="text-[8px] text-text-muted uppercase font-bold">
+                              {new Date(doubt.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-medium text-text-primary mb-2 group-hover:text-gold transition-colors">Q: {doubt.question}</h4>
+                          <p className="text-xs text-text-muted line-clamp-2 italic">A: {doubt.answer}</p>
+                        </Card>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <Card className="p-12 text-center bg-surface border-border-gold border-dashed">
+                      <p className="text-text-muted italic text-sm">Your brain feed is quiet. Start asking questions to populate it.</p>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Standard Resources */}
           <div className="mb-12">
-            <h2 className="font-display text-3xl text-text-primary mb-6">Available Courses</h2>
+            <h2 className="font-display text-3xl text-text-primary mb-6">Standard <span className="text-gold italic">Resources</span></h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course) => (
                 <motion.div
                   key={course._id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
                 >
                   <Card className="p-6 bg-surface border-border-gold hover:border-gold/30 transition-all h-full flex flex-col">
                     <div className="flex-1">
@@ -258,204 +451,54 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <GoldButton
-                      variant="filled"
+                      variant="ghost"
                       onClick={() => router.push(`/course/${course._id}`)}
-                      className="w-full"
+                      className="w-full text-xs"
                     >
-                      Continue Learning
+                      Enter Resource
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </GoldButton>
                   </Card>
                 </motion.div>
               ))}
             </div>
-            {courses.length === 0 && (
-              <Card className="p-12 text-center bg-surface border-border-gold border-dashed">
-                <BookOpen className="w-12 h-12 text-gold mx-auto mb-4" />
-                <p className="text-text-muted italic mb-2">No courses available yet.</p>
-                <p className="text-text-muted text-sm">Check back later for new content!</p>
-              </Card>
-            )}
           </div>
 
-          {/* AI Doubt System */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-12">
-            <div className="lg:col-span-2">
-              <h2 className="font-display text-3xl text-text-primary mb-6">Ask <span className="text-gold italic">AI Doubt</span></h2>
-              <Card className="p-6 bg-surface border-border-gold">
-                <form onSubmit={handleAskDoubt} className="space-y-4">
-                  <div className="relative">
-                    <MessageSquare className="absolute left-4 top-4 w-5 h-5 text-gold/50" />
-                    <textarea
-                      value={newQuestion}
-                      onChange={(e) => setNewQuestion(e.target.value)}
-                      placeholder="What are you struggling with today?"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-gold/50 transition-colors min-h-[120px] text-text-primary"
-                      required
-                    />
-                  </div>
-                  <div className="flex justify-end">
-                    <GoldButton variant="filled" disabled={askingDoubt} className="px-8">
-                      {askingDoubt ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <Send className="w-4 h-4 mr-2" />
-                      )}
-                      {askingDoubt ? "Asking AI..." : "Solve Doubt"}
-                    </GoldButton>
-                  </div>
-                </form>
-              </Card>
-
-              <div className="mt-8 space-y-4">
-                <h3 className="font-display text-xl text-text-primary flex items-center gap-2">
-                  <History className="w-5 h-5 text-gold" />
-                  Recent Doubts
-                </h3>
-                {doubts.length > 0 ? (
-                  doubts.map((doubt) => (
-                    <motion.div
-                      key={doubt._id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                    >
-                      <Card className="p-6 bg-surface border-border-gold/30">
-                        <p className="text-xs font-bold text-gold uppercase tracking-widest mb-2">{doubt.subject}</p>
-                        <h4 className="text-text-primary font-medium mb-3">Q: {doubt.question}</h4>
-                        <div className="p-4 bg-white/5 rounded-lg border border-white/5">
-                          <p className="text-sm text-text-muted leading-relaxed whitespace-pre-wrap">
-                            <span className="text-gold font-bold">AI:</span> {doubt.answer}
-                          </p>
-                        </div>
-                        <p className="text-[10px] text-text-muted mt-3 text-right">
-                          {new Date(doubt.createdAt).toLocaleDateString()}
-                        </p>
-                      </Card>
-                    </motion.div>
-                  ))
-                ) : (
-                  <p className="text-text-muted italic text-sm p-8 text-center border border-dashed border-white/10 rounded-xl">
-                    No doubts asked yet. Start by asking your first question!
-                  </p>
-                )}
+          {/* Legacy History (Optional: Can keep or remove) */}
+          <div className="border-t border-border-gold/10 pt-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-display text-2xl text-text-primary">Resource Activity</h2>
+              <div className="flex items-center gap-3">
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-surface border border-border-gold rounded-lg px-3 py-2 text-[10px] text-text-primary focus:outline-none uppercase tracking-widest font-bold"
+                >
+                  <option value="all">All</option>
+                  <option value="completed">Completed</option>
+                  <option value="in-progress">Active</option>
+                </select>
               </div>
             </div>
 
-            <div className="lg:col-span-1">
-              {/* Quick Stats (Moved here for better layout) */}
-              <div className="space-y-6">
-                <h2 className="font-display text-3xl text-text-primary mb-6">Stats</h2>
-                <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
-                  <div className="p-3 bg-orange-500/10 rounded-xl text-orange-500">
-                    <Flame className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Learning Streak</p>
-                    <p className="text-2xl font-display">{user?.streak || 0} Days</p>
-                  </div>
-                </Card>
-                <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
-                  <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Total Time</p>
-                    <p className="text-2xl font-display">{totalLearningTime} Mins</p>
-                  </div>
-                </Card>
-                <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
-                  <div className="p-3 bg-gold/10 rounded-xl text-gold">
-                    <TrendingUp className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Overall Progress</p>
-                    <p className="text-2xl font-display">{totalProgress}%</p>
-                  </div>
-                </Card>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            {/* Learning History */}
-            <div className="lg:col-span-2">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display text-3xl text-text-primary">Learning History</h2>
-                <div className="flex items-center gap-3">
-                  <div className="relative hidden sm:block">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                    <input 
-                      type="text"
-                      placeholder="Search courses..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="bg-surface border border-border-gold rounded-lg pl-9 pr-4 py-2 text-xs text-text-primary focus:outline-none focus:border-gold/50"
-                    />
-                  </div>
-                  <select 
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-surface border border-border-gold rounded-lg px-3 py-2 text-xs text-text-primary focus:outline-none"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="completed">Completed</option>
-                    <option value="in-progress">In Progress</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {filteredHistory.length > 0 ? (
-                  filteredHistory.map((item) => (
-                    <Card key={item._id} className="p-6 bg-surface border-border-gold hover:border-gold/30 transition-all">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-gold text-[10px] uppercase tracking-widest font-bold mb-1">{item.courseName}</p>
-                          <h4 className="text-text-primary font-display text-xl mb-1">{item.lessonName}</h4>
-                          <div className="flex items-center gap-4 text-xs text-text-muted">
-                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {item.timeSpent} mins</span>
-                            <span className="flex items-center gap-1">
-                              {item.completionStatus === 'completed' ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Circle className="w-3 h-3 text-amber-500" />}
-                              {item.completionStatus}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-text-muted font-bold">{new Date(item.createdAt).toLocaleDateString()}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredHistory.slice(0, 4).map((item) => (
+                <Card key={item._id} className="p-4 bg-surface border-border-gold/20 hover:border-gold/30 transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gold text-[8px] uppercase tracking-widest font-bold mb-1">{item.courseName}</p>
+                      <h4 className="text-text-primary font-display text-lg mb-1">{item.lessonName}</h4>
+                      <div className="flex items-center gap-4 text-[10px] text-text-muted uppercase tracking-tight">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {item.timeSpent}m</span>
+                        <span className="flex items-center gap-1">
+                          {item.completionStatus === 'completed' ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Circle className="w-3 h-3 text-amber-500" />}
+                          {item.completionStatus}
+                        </span>
                       </div>
-                    </Card>
-                  ))
-                ) : (
-                  <Card className="p-12 text-center bg-surface border-border-gold border-dashed">
-                    <p className="text-text-muted italic">No history found matching your criteria.</p>
-                  </Card>
-                )}
-              </div>
-            </div>
-
-            {/* Progress Track */}
-            <div>
-              <h2 className="font-display text-3xl text-text-primary mb-6">Course Progress</h2>
-              <div className="space-y-6">
-                {progress.map((course) => (
-                  <Card key={course._id} className="p-6 bg-surface border-border-gold">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="font-display text-xl text-text-primary">{course.courseId}</h4>
-                      <span className="text-gold font-bold text-sm">{course.percentage}%</span>
                     </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${course.percentage}%` }}
-                        transition={{ duration: 1, ease: "easeOut" }}
-                        className="h-full bg-gold shadow-[0_0_10px_rgba(201,168,76,0.3)]"
-                      />
-                    </div>
-                    <p className="text-[10px] text-text-muted mt-3 uppercase tracking-widest font-bold">
-                      {course.completedLessons.length} / {course.totalLessons} Lessons Completed
-                    </p>
-                  </Card>
-                ))}
-              </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           </div>
         </div>

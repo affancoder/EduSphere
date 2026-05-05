@@ -4,7 +4,9 @@ export interface IDoubt extends Document {
   userId: mongoose.Types.ObjectId;
   question: string;
   answer: string;
+  topic?: string;
   subject?: string;
+  timeSpent?: number;
   status: "pending" | "understood";
   createdAt: Date;
   updatedAt: Date;
@@ -26,9 +28,17 @@ const DoubtSchema = new Schema<IDoubt>(
       type: String,
       required: [true, "Please provide an answer"],
     },
+    topic: {
+      type: String,
+      trim: true,
+    },
     subject: {
       type: String,
       trim: true,
+    },
+    timeSpent: {
+      type: Number,
+      default: 0,
     },
     status: {
       type: String,

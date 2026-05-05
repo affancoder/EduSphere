@@ -1,5 +1,59 @@
 import mongoose from "mongoose";
 
+const VideoSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  }
+);
+
+const ResourceSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    type: {
+      type: String,
+      enum: ["pdf"],
+      default: "pdf",
+    },
+  }
+);
+
+const ModuleSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    videos: {
+      type: [VideoSchema],
+      default: [],
+    },
+    resources: {
+      type: [ResourceSchema],
+      default: [],
+    },
+  },
+  { _id: true }
+);
+
 const CourseSchema = new mongoose.Schema(
   {
     title: {
@@ -16,12 +70,22 @@ const CourseSchema = new mongoose.Schema(
     category: {
       type: String,
       required: [true, "Please provide a category"],
-      enum: ["Programming", "Mathematics", "Science", "Languages", "Other"],
+      enum: [
+        "frontend",
+        "backend",
+        "security",
+        "other",
+        "Programming",
+        "Mathematics",
+        "Science",
+        "Languages",
+        "Other",
+      ],
     },
     level: {
       type: String,
-      required: [true, "Please provide a level"],
       enum: ["Beginner", "Intermediate", "Advanced"],
+      default: "Beginner",
     },
     thumbnail: {
       type: String,
@@ -38,6 +102,19 @@ const CourseSchema = new mongoose.Schema(
     enrolledCount: {
       type: Number,
       default: 0,
+    },
+    isPremium: {
+      type: Boolean,
+      default: false,
+    },
+    price: {
+      type: Number,
+      min: [0, "Price cannot be negative"],
+      default: 0,
+    },
+    modules: {
+      type: [ModuleSchema],
+      default: [],
     },
   },
   { timestamps: true }

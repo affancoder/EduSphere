@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { BookOpen, Clock, CheckCircle2, Circle, ArrowLeft, Loader2 } from "lucide-react";
+import { BookOpen, Clock, CheckCircle2, Circle, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Card from "@/components/ui/Card";
@@ -28,6 +28,12 @@ interface Course {
   level: string;
   totalLessons: number;
   duration: number;
+  modules?: Array<{
+    _id?: string;
+    title: string;
+    videos?: Array<{ _id?: string; title: string; url: string }>;
+    resources?: Array<{ _id?: string; title: string; url: string; type: "pdf" }>;
+  }>;
 }
 
 export default function CoursePage() {
@@ -202,6 +208,58 @@ export default function CoursePage() {
               </motion.div>
             ))}
           </div>
+
+          {course.modules && course.modules.length > 0 && (
+            <div className="mt-10 space-y-6">
+              <h2 className="font-display text-3xl text-text-primary">Course Content</h2>
+              {course.modules.map((module, moduleIndex) => (
+                <div
+                  key={module._id ?? `${module.title}-${moduleIndex}`}
+                  className="rounded-lg border border-border-gold bg-surface p-6"
+                >
+                  <h3 className="mb-4 font-display text-xl text-text-primary">
+                    Module {moduleIndex + 1}: {module.title}
+                  </h3>
+
+                  {module.videos && module.videos.length > 0 && (
+                    <div className="mb-6 space-y-4">
+                      <p className="text-sm font-semibold uppercase tracking-widest text-gold">
+                        Videos
+                      </p>
+                      {module.videos.map((video) => (
+                        <div key={video._id ?? video.url} className="space-y-2">
+                          <p className="text-sm text-text-primary">{video.title}</p>
+                          <video controls className="w-full rounded-md bg-black">
+                            <source src={video.url} type="video/mp4" />
+                            Your browser does not support the video tag.
+                          </video>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {module.resources && module.resources.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold uppercase tracking-widest text-gold">
+                        PDFs
+                      </p>
+                      {module.resources.map((resource) => (
+                        <a
+                          key={resource._id ?? resource.url}
+                          href={resource.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block text-sm text-blue-300 underline underline-offset-4 hover:text-blue-200"
+                        >
+                          View PDF: {resource.title}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
