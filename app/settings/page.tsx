@@ -15,14 +15,22 @@ import {
   AlertCircle
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import Footer from "../../components/Footer";
+import Footer from "@/components/Footer";
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 import Link from "next/link";
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  profileImage?: string;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -53,6 +61,7 @@ export default function SettingsPage() {
           router.push("/login");
         }
       } catch (err) {
+        console.error("Failed to fetch user:", err);
         router.push("/login");
       } finally {
         setLoading(false);
@@ -93,6 +102,7 @@ export default function SettingsPage() {
         setMessage({ type: "error", text: data.error || "Update failed" });
       }
     } catch (err) {
+      console.error("Update error:", err);
       setMessage({ type: "error", text: "An unexpected error occurred" });
     } finally {
       setUpdating(false);

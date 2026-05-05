@@ -35,7 +35,6 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, understood: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "understood">("all");
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
@@ -57,7 +56,6 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok) {
         setDoubts(data);
-        setLastUpdated(new Date());
       } else {
         setError(data.error || "Failed to fetch doubts");
       }
@@ -159,7 +157,10 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-[#0b0b0f] flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-10 h-10 text-[#d4af37] animate-spin" />
-        <p className="text-text-muted text-sm animate-pulse">Verifying credentials...</p>
+        <div className="flex flex-col items-center gap-1">
+          <p className="text-text-muted text-sm font-bold tracking-widest uppercase animate-pulse">Verifying credentials...</p>
+          <p className="text-[10px] text-text-muted opacity-50 uppercase tracking-tighter">Securing your session</p>
+        </div>
       </div>
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Mail, Loader2, AlertCircle, CheckCircle2, ChevronLeft } from "lucide-react";
 import Card from "@/components/ui/Card";
@@ -11,6 +11,11 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +42,8 @@ export default function ForgotPasswordPage() {
       setLoading(false);
     }
   };
+
+  if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">

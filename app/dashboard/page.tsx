@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { 
@@ -17,14 +17,24 @@ import {
   Circle
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import Footer from "../../components/Footer";
+import Footer from "@/components/Footer";
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 import Link from "next/link";
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  streak: number;
+  lastLogin: string;
+  profileImage?: string;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [progress, setProgress] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,15 +83,23 @@ export default function DashboardPage() {
     }
   };
 
-  const filteredHistory = history.filter(item => {
-    const matchesSearch = item.courseName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = statusFilter === "all" || item.completionStatus === statusFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredHistory = useMemo(() => {
+    return history.filter(item => {
+      const matchesSearch = item.courseName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = statusFilter === "all" || item.completionStatus === statusFilter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [history, searchTerm, statusFilter]);
 
-  const totalProgress = progress.length > 0 
-    ? Math.round(progress.reduce((acc, curr) => acc + curr.percentage, 0) / progress.length)
-    : 0;
+  const totalProgress = useMemo(() => {
+    return progress.length > 0 
+      ? Math.round(progress.reduce((acc, curr) => acc + curr.percentage, 0) / progress.length)
+      : 0;
+  }, [progress]);
+
+  const totalLearningTime = useMemo(() => {
+    return history.reduce((acc, curr) => acc + curr.timeSpent, 0);
+  }, [history]);
 
   if (loading) {
     return (
@@ -107,7 +125,7 @@ export default function DashboardPage() {
               <h1 className="font-display text-4xl md:text-5xl text-text-primary mb-2">
                 Welcome back, <span className="text-gold italic">{user?.name}</span>
               </h1>
-              <p className="text-text-muted">Last login: {new Date(user?.lastLogin).toLocaleDateString()}</p>
+              <p className="text-text-muted">Last login: {user?.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "First time logging in"}</p>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/settings">
@@ -140,7 +158,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Total Time</p>
-                <p className="text-2xl font-display">{history.reduce((acc, curr) => acc + curr.timeSpent, 0)} Mins</p>
+                <p className="text-2xl font-display">{totalLearningTime} Mins</p>
               </div>
             </Card>
             <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">

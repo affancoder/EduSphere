@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import Footer from "../../components/Footer";
+import Footer from "@/components/Footer";
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 
@@ -55,7 +55,10 @@ export default function HistoryPage() {
   }, []);
 
   useEffect(() => {
-    fetchDoubts();
+    const init = async () => {
+      await fetchDoubts();
+    };
+    init();
   }, [fetchDoubts]);
 
   const handleView = (doubt: Doubt) => {
@@ -74,7 +77,7 @@ export default function HistoryPage() {
     }
   };
 
-  const handleToggleStatus = async (id: string, currentStatus: string) => {
+  const handleToggleStatus = async (id: string, currentStatus: "pending" | "understood") => {
     const newStatus = currentStatus === "understood" ? "pending" : "understood";
     try {
       const res = await fetch(`/api/doubts/${id}`, {
@@ -84,7 +87,7 @@ export default function HistoryPage() {
       });
       if (res.ok) {
         setDoubts((prev) =>
-          prev.map((d) => (d._id === id ? { ...d, status: newStatus as "pending" | "understood" } : d))
+          prev.map((d) => (d._id === id ? { ...d, status: newStatus } : d))
         );
       }
     } catch (err) {
@@ -203,7 +206,7 @@ export default function HistoryPage() {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handleToggleStatus(doubt._id, doubt.status)}
+                            onClick={() => handleToggleStatus(doubt._id, doubt.status as "pending" | "understood")}
                             className={`p-2 rounded-xl bg-white/5 border border-white/5 transition-all ${doubt.status === 'understood' ? 'text-emerald-500 hover:bg-emerald-500/5' : 'text-text-muted hover:text-emerald-500 hover:bg-emerald-500/5'}`} 
                             title={doubt.status === 'understood' ? "Mark as Pending" : "Mark as Understood"}
                           >

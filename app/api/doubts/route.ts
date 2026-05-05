@@ -38,13 +38,13 @@ export async function GET(req: NextRequest) {
         "Cache-Control": "no-store, max-age=0",
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("❌ Error fetching doubts (/api/doubts):", error);
     
     return NextResponse.json(
       { 
         error: "Failed to fetch doubts from the database.",
-        message: error.message 
+        message: error instanceof Error ? error.message : "Unknown error" 
       },
       { status: 500 }
     );
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     let body;
     try {
       body = await req.json();
-    } catch (e) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid JSON in request body." },
         { status: 400 }
@@ -90,12 +90,12 @@ export async function POST(req: NextRequest) {
 
     // 5. Return the created document
     return NextResponse.json(newDoubt, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("❌ Error creating doubt (/api/doubts):", error);
     return NextResponse.json(
       { 
         error: "An unexpected error occurred while creating the doubt.",
-        message: error.message 
+        message: error instanceof Error ? error.message : "Unknown error" 
       },
       { status: 500 }
     );

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Sparkles, Loader2, Save, CheckCircle, MessageSquareQuote } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import Footer from "../../components/Footer";
+import Footer from "@/components/Footer";
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 

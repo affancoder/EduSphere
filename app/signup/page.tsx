@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { UserPlus, Mail, Key, User, Loader2, AlertCircle } from "lucide-react";
@@ -17,6 +17,11 @@ export default function SignupPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +50,8 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
