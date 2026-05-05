@@ -14,8 +14,13 @@ export async function GET() {
     // 1. Establish database connection
     await connectDB();
 
-    // 2. Fetch all doubts, sorted by newest first
-    const doubts = await Doubt.find({}).sort({ createdAt: -1 }).lean();
+    // 2. Fetch recent doubts, sorted by newest first
+    // Selecting only necessary fields for performance and limiting to 20 results
+    const doubts = await Doubt.find({})
+      .select("question subject status createdAt")
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
     
     // 3. Return the doubts as a JSON array
     return NextResponse.json(doubts, {
