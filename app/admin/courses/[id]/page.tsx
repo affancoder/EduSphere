@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 type Video = { _id?: string; title: string; url: string };
@@ -9,8 +9,11 @@ type Module = { _id: string; title: string; videos: Video[]; resources: Resource
 type Course = { _id: string; title: string; modules: Module[] };
 
 export default function AdminCourseContentPage() {
+  console.log("COMPONENT LOADED: /admin/courses/[id]");
   const params = useParams<{ id: string }>();
   const courseId = params?.id;
+  const videoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const pdfInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [course, setCourse] = useState<Course | null>(null);
   const [moduleTitle, setModuleTitle] = useState("");
   const [videoTitles, setVideoTitles] = useState<Record<string, string>>({});
@@ -19,6 +22,8 @@ export default function AdminCourseContentPage() {
   const [pdfFiles, setPdfFiles] = useState<Record<string, File | null>>({});
   const [busy, setBusy] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
+  const [inputVersion, setInputVersion] = useState<Record<string, number>>({});
 
   const loadCourse = useCallback(async () => {
     if (!courseId) return;
@@ -47,6 +52,7 @@ export default function AdminCourseContentPage() {
   };
 
   const uploadFile = async (file: File) => {
+    console.log("uploadFile file:", file);
     const form = new FormData();
     form.append("file", file);
     const uploadRes = await fetch("/api/admin/upload", {
@@ -55,17 +61,22 @@ export default function AdminCourseContentPage() {
     });
     if (!uploadRes.ok) {
       const error = await uploadRes.json();
+      console.log("uploadFile error response:", error);
       throw new Error(error.error || "Upload failed");
     }
     const uploadData = await uploadRes.json();
-    return uploadData.secure_url as string;
+    console.log("uploadFile response:", uploadData);
+    return uploadData.url as string;
   };
 
   const onVideoUpload = async (moduleId: string, file: File) => {
+    console.log("clicked Upload Video");
+    console.log("video file:", file);
     const title = (videoTitles[moduleId] || file.name).trim();
     if (!title) return;
     setBusy(`video-${moduleId}`);
     setError("");
+    setSuccess("");
     try {
       const url = await uploadFile(file);
       const saveRes = await fetch(`/api/admin/course/${courseId}/module/${moduleId}/video`, {
@@ -75,10 +86,15 @@ export default function AdminCourseContentPage() {
       });
       if (!saveRes.ok) {
         const saveError = await saveRes.json();
+        console.log("save video error response:", saveError);
         throw new Error(saveError.error || "Failed to attach video to module");
       }
+      const saveData = await saveRes.json();
+      console.log("save video response:", saveData);
       setVideoTitles((prev) => ({ ...prev, [moduleId]: "" }));
       setVideoFiles((prev) => ({ ...prev, [moduleId]: null }));
+      setInputVersion((prev) => ({ ...prev, [`video-${moduleId}`]: (prev[`video-${moduleId}`] ?? 0) + 1 }));
+      setSuccess("Video uploaded successfully");
       await loadCourse();
     } catch (uploadError: unknown) {
       const message =
@@ -90,10 +106,13 @@ export default function AdminCourseContentPage() {
   };
 
   const onPdfUpload = async (moduleId: string, file: File) => {
+    console.log("clicked Upload PDF");
+    console.log("pdf file:", file);
     const title = (pdfTitles[moduleId] || file.name).trim();
     if (!title) return;
     setBusy(`pdf-${moduleId}`);
     setError("");
+    setSuccess("");
     try {
       const url = await uploadFile(file);
       const saveRes = await fetch(`/api/admin/course/${courseId}/module/${moduleId}/resource`, {
@@ -103,10 +122,15 @@ export default function AdminCourseContentPage() {
       });
       if (!saveRes.ok) {
         const saveError = await saveRes.json();
+        console.log("save pdf error response:", saveError);
         throw new Error(saveError.error || "Failed to attach PDF to module");
       }
+      const saveData = await saveRes.json();
+      console.log("save pdf response:", saveData);
       setPdfTitles((prev) => ({ ...prev, [moduleId]: "" }));
       setPdfFiles((prev) => ({ ...prev, [moduleId]: null }));
+      setInputVersion((prev) => ({ ...prev, [`pdf-${moduleId}`]: (prev[`pdf-${moduleId}`] ?? 0) + 1 }));
+      setSuccess("PDF uploaded successfully");
       await loadCourse();
     } catch (uploadError: unknown) {
       const message =
@@ -118,15 +142,38 @@ export default function AdminCourseContentPage() {
   };
 
   if (!course) {
-    return <div className="text-white/70">Loading course content...</div>;
+    return (
+      <div className="text-white/70">
+        <button
+          onClick={() => console.log("CLICKED TEST BUTTON (loading state)")}
+          className="mb-4 rounded bg-white px-3 py-2 text-sm text-black"
+          style={{ position: "relative", zIndex: 9999, pointerEvents: "auto" }}
+        >
+          Click Test
+        </button>
+        Loading course content...
+      </div>
+    );
   }
 
   return (
     <section className="space-y-6">
+      <button
+        onClick={() => console.log("CLICKED TEST BUTTON (rendered state)")}
+        className="rounded bg-white px-3 py-2 text-sm text-black"
+        style={{ position: "relative", zIndex: 9999, pointerEvents: "auto" }}
+      >
+        Click Test
+      </button>
       <h1 className="text-3xl font-display">{course.title}</h1>
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
           {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+          {success}
         </div>
       )}
 
@@ -167,21 +214,54 @@ export default function AdminCourseContentPage() {
                 className="mb-2 w-full rounded border border-white/10 bg-black/30 px-3 py-2"
               />
               <input
+                key={`video-input-${module._id}-${inputVersion[`video-${module._id}`] ?? 0}`}
+                ref={(el) => {
+                  videoInputRefs.current[module._id] = el;
+                }}
                 type="file"
                 accept="video/mp4"
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  setVideoFiles((prev) => ({ ...prev, [module._id]: file ?? null }));
+                  const file = e.target.files?.[0] ?? null;
+                  console.log("selected video file:", file);
+                  setVideoFiles((prev) => ({ ...prev, [module._id]: file }));
                 }}
-                disabled={busy === `video-${module._id}`}
-                className="block w-full text-sm text-white/70"
+                className="hidden"
               />
               <button
+                type="button"
                 onClick={() => {
-                  const file = videoFiles[module._id];
-                  if (file) void onVideoUpload(module._id, file);
+                  console.log("clicked Choose Video button (UI)");
+                  setError("");
+                  const input = videoInputRefs.current[module._id];
+                  if (!input) {
+                    setError("Video input not ready. Try again.");
+                    return;
+                  }
+                  input.click();
                 }}
-                disabled={!videoFiles[module._id] || busy === `video-${module._id}`}
+                disabled={busy === `video-${module._id}`}
+                className="rounded border border-white/20 px-3 py-2 text-xs text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ position: "relative", zIndex: 50, pointerEvents: "auto" }}
+              >
+                Choose MP4
+              </button>
+              {videoFiles[module._id] && (
+                <p className="mt-1 text-xs text-white/60">
+                  Selected: {videoFiles[module._id]!.name}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  console.log("clicked Upload Video button (UI)");
+                  const file = videoFiles[module._id];
+                  if (!file) {
+                    setError("Please select an MP4 file first.");
+                    return;
+                  }
+                  void onVideoUpload(module._id, file);
+                }}
+                disabled={busy === `video-${module._id}`}
                 className="mt-2 rounded bg-[#d4af37] px-3 py-2 text-xs text-black disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy === `video-${module._id}` ? "Uploading video..." : "Upload Video"}
@@ -204,21 +284,54 @@ export default function AdminCourseContentPage() {
                 className="mb-2 w-full rounded border border-white/10 bg-black/30 px-3 py-2"
               />
               <input
+                key={`pdf-input-${module._id}-${inputVersion[`pdf-${module._id}`] ?? 0}`}
+                ref={(el) => {
+                  pdfInputRefs.current[module._id] = el;
+                }}
                 type="file"
                 accept="application/pdf"
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  setPdfFiles((prev) => ({ ...prev, [module._id]: file ?? null }));
+                  const file = e.target.files?.[0] ?? null;
+                  console.log("selected pdf file:", file);
+                  setPdfFiles((prev) => ({ ...prev, [module._id]: file }));
                 }}
-                disabled={busy === `pdf-${module._id}`}
-                className="block w-full text-sm text-white/70"
+                className="hidden"
               />
               <button
+                type="button"
                 onClick={() => {
-                  const file = pdfFiles[module._id];
-                  if (file) void onPdfUpload(module._id, file);
+                  console.log("clicked Choose PDF button (UI)");
+                  setError("");
+                  const input = pdfInputRefs.current[module._id];
+                  if (!input) {
+                    setError("PDF input not ready. Try again.");
+                    return;
+                  }
+                  input.click();
                 }}
-                disabled={!pdfFiles[module._id] || busy === `pdf-${module._id}`}
+                disabled={busy === `pdf-${module._id}`}
+                className="rounded border border-white/20 px-3 py-2 text-xs text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ position: "relative", zIndex: 50, pointerEvents: "auto" }}
+              >
+                Choose PDF
+              </button>
+              {pdfFiles[module._id] && (
+                <p className="mt-1 text-xs text-white/60">
+                  Selected: {pdfFiles[module._id]!.name}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  console.log("clicked Upload PDF button (UI)");
+                  const file = pdfFiles[module._id];
+                  if (!file) {
+                    setError("Please select a PDF file first.");
+                    return;
+                  }
+                  void onPdfUpload(module._id, file);
+                }}
+                disabled={busy === `pdf-${module._id}`}
                 className="mt-2 rounded bg-[#d4af37] px-3 py-2 text-xs text-black disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy === `pdf-${module._id}` ? "Uploading PDF..." : "Upload PDF"}

@@ -75,7 +75,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({
-    secure_url: uploaded.secure_url,
+    url: uploaded.secure_url,
     resource_type: uploaded.resource_type,
   });
 }

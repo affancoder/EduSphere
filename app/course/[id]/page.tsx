@@ -57,6 +57,7 @@ export default function CoursePage() {
         const progressData = await progressRes.json();
 
         if (courseData.success) {
+          console.log("Course modules:", courseData.course?.modules);
           setCourse(courseData.course);
           setLessons(courseData.lessons);
         } else {

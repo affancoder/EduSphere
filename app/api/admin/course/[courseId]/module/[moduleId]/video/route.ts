@@ -36,26 +36,22 @@ export async function POST(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const updateResult = await Course.updateOne(
-    { _id: courseId, "modules._id": moduleId },
-    {
-      $push: {
-        "modules.$.videos": {
-          _id: new mongoose.Types.ObjectId(),
-          title: title.trim(),
-          url: url.trim(),
-        },
-      },
-    }
-  );
-
-  if (!updateResult.matchedCount) {
-    return NextResponse.json(
-      { error: "Course/module not found" },
-      { status: 404 }
-    );
+  const course = await Course.findById(courseId);
+  if (!course) {
+    return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
 
-  const course = await Course.findById(courseId);
-  return NextResponse.json({ course });
+  const moduleDoc = course.modules?.id(moduleId);
+  if (!moduleDoc) {
+    return NextResponse.json({ error: "Module not found" }, { status: 404 });
+  }
+
+  moduleDoc.videos.push({
+    _id: new mongoose.Types.ObjectId(),
+    title: title.trim(),
+    url: url.trim(),
+  });
+
+  await course.save();
+  return NextResponse.json({ success: true, course }, { status: 200 });
 }
