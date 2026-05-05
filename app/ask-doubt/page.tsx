@@ -27,28 +27,39 @@ export default function AskDoubtPage() {
     setLoading(true);
     setResult(null);
 
-    // TODO: Replace with API call (/api/ask)
-    // Mock API delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, subject }),
+      });
 
-    setResult({
-      explanation: "Closure is a function that remembers variables from its outer scope even after the outer function has finished executing. It's like a backpack that a function carries around, containing all the variables it needs from its birthplace.",
-      example: "function outer() {\n  let count = 0;\n  return function inner() {\n    count++;\n    return count;\n  };\n}\nconst counter = outer();\nconsole.log(counter()); // 1\nconsole.log(counter()); // 2",
-      quiz: ["What is closure?", "Why is it used?", "Give one example"],
-    });
-    setLoading(false);
+      const data = await res.json();
+
+      if (res.ok) {
+        setResult({
+          explanation: data.explanation,
+          example: data.example,
+          quiz: data.quiz,
+        });
+      } else {
+        alert(data.error || "Failed to get an explanation. Please try again.");
+      }
+    } catch (err) {
+      console.error("Ask doubt error:", err);
+      alert("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveDoubt = () => {
-    // TODO: Save to database
-    console.log("Doubt saved:", { question, subject, result });
-    alert("Doubt saved to your profile!");
+    alert("Doubt has been automatically saved to your history!");
   };
 
   const handleMarkAsUnderstood = () => {
     setResult(null);
     setQuestion("");
-    alert("Great! Keep learning.");
   };
 
   return (

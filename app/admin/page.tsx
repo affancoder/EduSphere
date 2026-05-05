@@ -16,7 +16,7 @@ import {
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 
-export interface Doubt {
+interface Doubt {
   _id: string;
   question: string;
   subject?: string;
@@ -32,11 +32,22 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [doubts, setDoubts] = useState<Doubt[]>([]);
+  const [stats, setStats] = useState({ total: 0, pending: 0, understood: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "understood">("all");
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/stats");
+      const data = await res.json();
+      if (res.ok) setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  }, []);
 
   const fetchDoubts = useCallback(async () => {
     setLoading(true);
@@ -59,16 +70,20 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const loggedIn = typeof window !== "undefined" && !!localStorage.getItem("admin_logged_in");
+    const checkAuth = async () => {
+      const loggedIn = typeof window !== "undefined" && !!localStorage.getItem("admin_logged_in");
+      
+      if (!loggedIn) {
+        setIsAuthenticated(false);
+        router.push("/admin/login");
+      } else {
+        setIsAuthenticated(true);
+        await Promise.all([fetchDoubts(), fetchStats()]);
+      }
+    };
     
-    if (!loggedIn) {
-      setIsAuthenticated(false);
-      router.push("/admin/login");
-    } else {
-      setIsAuthenticated(true);
-      fetchDoubts();
-    }
-  }, [router, fetchDoubts]);
+    checkAuth();
+  }, [router, fetchDoubts, fetchStats]);
 
   const handleUpdateStatus = async (id: string, newStatus: "pending" | "understood") => {
     setProcessingIds(prev => new Set(prev).add(id));
@@ -81,6 +96,8 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setDoubts(prev => prev.map(d => d._id === id ? { ...d, status: newStatus } : d));
+        // Refresh stats after status update
+        fetchStats();
       } else {
         const data = await res.json();
         setError(data.error || "Failed to update status");
@@ -105,6 +122,8 @@ export default function AdminDashboard() {
       const res = await fetch(`/api/doubts/${id}`, { method: "DELETE" });
       if (res.ok) {
         setDoubts(prev => prev.filter(d => d._id !== id));
+        // Refresh stats after deletion
+        fetchStats();
       } else {
         const data = await res.json();
         setError(data.error || "Failed to delete doubt");
@@ -123,16 +142,8 @@ export default function AdminDashboard() {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("admin_logged_in");
-    // Clear the session cookie as well
-    document.cookie = "admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
     router.push("/admin/login");
   }, [router]);
-
-  const stats = useMemo(() => ({
-    total: doubts.length,
-    pending: doubts.filter(d => d.status === "pending").length,
-    understood: doubts.filter(d => d.status === "understood").length,
-  }), [doubts]);
 
   const filteredDoubts = useMemo(() => {
     return doubts.filter((d: Doubt) => {
@@ -173,12 +184,6 @@ export default function AdminDashboard() {
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col items-end text-[10px] text-text-muted font-bold tracking-widest uppercase">
-              <span>Last Sync</span>
-              <span className="text-[#d4af37]">
-                {lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
-              </span>
-            </div>
             <button 
               onClick={() => fetchDoubts()}
               disabled={loading}
@@ -275,28 +280,13 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-white/5">
                 <AnimatePresence mode="popLayout">
                   {isInitialLoading ? (
-                    [...Array(6)].map((_, i) => (
-                      <tr key={`skeleton-${i}`} className="animate-pulse border-b border-white/5 last:border-0">
-                        <td className="px-6 py-5">
-                          <div className="flex flex-col gap-2">
-                            <div className="h-4 bg-white/10 rounded w-3/4"></div>
-                            <div className="h-3 bg-white/5 rounded w-1/2"></div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5"><div className="h-6 bg-white/10 rounded-md w-16"></div></td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-white/10"></div>
-                            <div className="h-3 bg-white/10 rounded w-16"></div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5"><div className="h-4 bg-white/10 rounded w-20"></div></td>
-                        <td className="px-6 py-5 text-right">
-                          <div className="flex justify-end gap-2">
-                            <div className="w-8 h-8 bg-white/10 rounded-lg"></div>
-                            <div className="w-8 h-8 bg-white/10 rounded-lg"></div>
-                          </div>
-                        </td>
+                    [...Array(5)].map((_, i) => (
+                      <tr key={`skeleton-${i}`} className="animate-pulse">
+                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-3/4"></div></td>
+                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-20"></div></td>
+                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-24"></div></td>
+                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-16"></div></td>
+                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-20 ml-auto"></div></td>
                       </tr>
                     ))
                   ) : filteredDoubts.length > 0 ? (

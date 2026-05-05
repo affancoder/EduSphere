@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Doubt from "@/models/Doubt";
 
@@ -6,23 +6,32 @@ import Doubt from "@/models/Doubt";
 export const dynamic = "force-dynamic";
 
 /**
- * GET API route to fetch all doubts from the database.
- * Doubts are sorted by 'createdAt' in descending order (latest first).
+ * GET API route to fetch doubts from the database.
+ * Supports filtering by status via query parameter: ?status=pending
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // 1. Establish database connection
+    // 1. Get query parameters
+    const status = req.nextUrl.searchParams.get("status");
+
+    // 2. Establish database connection
     await connectDB();
 
-    // 2. Fetch recent doubts, sorted by newest first
+    // 3. Build query object with proper typing
+    const query: { status?: string } = {};
+    if (status && ["pending", "understood"].includes(status)) {
+      query.status = status;
+    }
+
+    // 4. Fetch recent doubts based on query
     // Selecting only necessary fields for performance and limiting to 20 results
-    const doubts = await Doubt.find({})
+    const doubts = await Doubt.find(query)
       .select("question subject status createdAt")
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
     
-    // 3. Return the doubts as a JSON array
+    // 5. Return the doubts as a JSON array
     return NextResponse.json(doubts, {
       status: 200,
       headers: {
@@ -46,10 +55,20 @@ export async function GET() {
  * POST API route to create a new doubt.
  * Accepts: { question: string, subject: string }
  */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    // 1. Parse request body
-    const { question, subject } = await req.json();
+    // 1. Parse request body safely
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json(
+        { error: "Invalid JSON in request body." },
+        { status: 400 }
+      );
+    }
+
+    const { question, subject } = body;
 
     // 2. Validate input
     if (!question || typeof question !== "string" || question.trim() === "") {

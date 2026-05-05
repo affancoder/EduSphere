@@ -17,15 +17,32 @@ const navLinks = [
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
+    // Check for login status (could be extended to use a real auth context later)
+    const checkLoginStatus = () => {
+      const loggedIn = localStorage.getItem("isLoggedIn") === "true" || 
+                      localStorage.getItem("admin_logged_in") === "true";
+      setIsLoggedIn(loggedIn);
+    };
+
+    checkLoginStatus();
+    
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("admin_logged_in");
+    setIsLoggedIn(false);
+    window.location.href = "/";
+  };
 
   return (
     <nav
@@ -67,8 +84,23 @@ export default function Navbar() {
 
         {/* Auth Buttons */}
         <div className="hidden md:flex items-center gap-4">
-          <GoldButton variant="ghost">Sign In</GoldButton>
-          <GoldButton variant="filled">Start Learning</GoldButton>
+          {isLoggedIn ? (
+            <>
+              <Link href="/dashboard">
+                <GoldButton variant="ghost">Dashboard</GoldButton>
+              </Link>
+              <GoldButton variant="filled" onClick={handleLogout}>Logout</GoldButton>
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <GoldButton variant="ghost">Login</GoldButton>
+              </Link>
+              <Link href="/signup">
+                <GoldButton variant="filled">Signup</GoldButton>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Toggle */}
@@ -103,8 +135,23 @@ export default function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-4 pt-4">
-                <GoldButton variant="ghost" className="w-full">Sign In</GoldButton>
-                <GoldButton variant="filled" className="w-full">Start Learning</GoldButton>
+                {isLoggedIn ? (
+                  <>
+                    <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
+                      <GoldButton variant="ghost" className="w-full">Dashboard</GoldButton>
+                    </Link>
+                    <GoldButton variant="filled" className="w-full" onClick={handleLogout}>Logout</GoldButton>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                      <GoldButton variant="ghost" className="w-full">Login</GoldButton>
+                    </Link>
+                    <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                      <GoldButton variant="filled" className="w-full">Signup</GoldButton>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

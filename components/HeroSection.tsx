@@ -1,9 +1,18 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import GoldButton from "./ui/GoldButton";
 
 export default function HeroSection() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const loggedIn = localStorage.getItem("isLoggedIn") === "true" || 
+                    localStorage.getItem("admin_logged_in") === "true";
+    setIsLoggedIn(loggedIn);
+  }, []);
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -75,12 +84,33 @@ export default function HeroSection() {
           variants={itemVariants}
           className="flex flex-col sm:flex-row items-center justify-center gap-6"
         >
-          <GoldButton className="px-10 py-4 text-base">
-            Explore Curriculums
-          </GoldButton>
-          <GoldButton variant="ghost" className="px-10 py-4 text-base">
-            Meet the Mentors
-          </GoldButton>
+          {isLoggedIn ? (
+            <>
+              <Link href="/dashboard">
+                <GoldButton className="px-10 py-4 text-base">
+                  Go to Dashboard
+                </GoldButton>
+              </Link>
+              <Link href="/courses">
+                <GoldButton variant="ghost" className="px-10 py-4 text-base">
+                  Explore Courses
+                </GoldButton>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/signup">
+                <GoldButton className="px-10 py-4 text-base">
+                  Join Now (Signup)
+                </GoldButton>
+              </Link>
+              <Link href="/login">
+                <GoldButton variant="ghost" className="px-10 py-4 text-base">
+                  Login Access
+                </GoldButton>
+              </Link>
+            </>
+          )}
         </motion.div>
       </motion.div>
 
