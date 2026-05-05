@@ -12,7 +12,7 @@ export async function GET(
     const lesson = await Lesson.findById(params.id);
     
     if (!lesson) {
-      return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Lesson not found" }, { status: 404 });
     }
 
     const course = await Course.findById(lesson.courseId).select("title");
@@ -25,6 +25,7 @@ export async function GET(
     const nextLessonId = currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1]._id : null;
 
     return NextResponse.json({ 
+      success: true,
       lesson, 
       courseTitle: course?.title,
       totalLessons: allLessons.length,
@@ -33,6 +34,6 @@ export async function GET(
     }, { status: 200 });
   } catch (error) {
     console.error("Failed to fetch lesson:", error);
-    return NextResponse.json({ error: "Failed to fetch lesson" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to fetch lesson" }, { status: 500 });
   }
 }

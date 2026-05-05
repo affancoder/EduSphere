@@ -12,13 +12,14 @@ export async function GET(
     const course = await Course.findById(params.courseId);
     
     if (!course) {
-      return NextResponse.json({ error: "Course not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Course not found" }, { status: 404 });
     }
 
     const lessons = await Lesson.find({ courseId: params.courseId }).sort({ order: 1 });
 
-    return NextResponse.json({ course, lessons }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch course" }, { status: 500 });
+    return NextResponse.json({ success: true, course, lessons }, { status: 200 });
+  } catch (error: any) {
+    console.error(`API Course Detail Error [${params.courseId}]:`, error);
+    return NextResponse.json({ success: false, error: "Failed to fetch course details" }, { status: 500 });
   }
 }

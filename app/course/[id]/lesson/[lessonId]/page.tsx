@@ -39,7 +39,7 @@ export default function LessonPage() {
       try {
         const res = await fetch(`/api/lessons/${params.lessonId}`);
         const data = await res.json();
-        if (res.ok) {
+        if (data.success) {
           setLesson(data.lesson);
           setCourse({ _id: params.id as string, title: data.courseTitle });
           setIsCompleted(data.lesson.isCompleted);

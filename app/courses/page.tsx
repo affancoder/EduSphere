@@ -32,7 +32,7 @@ export default function CoursesPage() {
       try {
         const res = await fetch("/api/courses");
         const data = await res.json();
-        if (res.ok) {
+        if (data.success) {
           setCourses(data.courses);
         } else {
           setError(data.error || "Failed to load courses");

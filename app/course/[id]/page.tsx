@@ -50,7 +50,7 @@ export default function CoursePage() {
         const courseData = await courseRes.json();
         const progressData = await progressRes.json();
 
-        if (courseRes.ok) {
+        if (courseData.success) {
           setCourse(courseData.course);
           setLessons(courseData.lessons);
         } else {
