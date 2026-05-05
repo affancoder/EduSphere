@@ -22,11 +22,13 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     if (!token) {
-      setMessage({ type: "error", text: "Invalid or missing reset token. Please request a new one." });
+      Promise.resolve().then(() => {
+        setMessage({ type: "error", text: "Invalid or missing reset token. Please request a new one." });
+      });
     }
   }, [token]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       setMessage({ type: "error", text: "Passwords do not match" });
@@ -51,7 +53,7 @@ function ResetPasswordForm() {
       } else {
         setMessage({ type: "error", text: data.error || "Reset failed" });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: "error", text: "Failed to connect to server" });
     } finally {
       setLoading(false);
@@ -79,7 +81,7 @@ function ResetPasswordForm() {
               animate={{ opacity: 1, y: 0 }}
               className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500"
             >
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <AlertCircle className="w-5 h-5 shrink-0" />
               <p className="text-sm font-medium">{message.text}</p>
             </motion.div>
           )}

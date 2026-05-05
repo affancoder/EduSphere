@@ -11,7 +11,8 @@ export default function HeroSection() {
   useEffect(() => {
     const loggedIn = localStorage.getItem("isLoggedIn") === "true" || 
                     localStorage.getItem("admin_logged_in") === "true";
-    setIsLoggedIn(loggedIn);
+    const timer = setTimeout(() => setIsLoggedIn(loggedIn), 0);
+    return () => clearTimeout(timer);
   }, []);
   const containerVariants = {
     hidden: { opacity: 0 },

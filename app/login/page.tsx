@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { LogIn, Mail, Key, Loader2, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import Card from "@/components/ui/Card";
@@ -9,7 +8,6 @@ import GoldButton from "@/components/ui/GoldButton";
 import Link from "next/link";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -20,7 +18,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const email = formData.email.trim();
     const password = formData.password.trim();
@@ -56,7 +54,7 @@ export default function LoginPage() {
       } else {
         setError(data.error || "Authentication failed. Please check your credentials.");
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please ensure you are connected and try again.");
     } finally {
       setLoading(false);
@@ -64,12 +62,15 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    setIsMounted(true);
     const savedEmail = localStorage.getItem("remembered_email");
-    if (savedEmail) {
-      setFormData(prev => ({ ...prev, email: savedEmail }));
-      setRememberMe(true);
-    }
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+      if (savedEmail) {
+        setFormData(prev => ({ ...prev, email: savedEmail }));
+        setRememberMe(true);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!isMounted) return null;
@@ -97,7 +98,7 @@ export default function LoginPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500"
               >
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <AlertCircle className="w-5 h-5 shrink-0" />
                 <p className="text-sm font-medium">{error}</p>
               </motion.div>
             )}

@@ -14,10 +14,11 @@ export default function ForgotPasswordPage() {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => setIsMounted(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
@@ -36,7 +37,7 @@ export default function ForgotPasswordPage() {
       } else {
         setMessage({ type: "error", text: data.error || "Something went wrong" });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: "error", text: "Failed to connect to server" });
     } finally {
       setLoading(false);
@@ -62,7 +63,7 @@ export default function ForgotPasswordPage() {
             <Mail className="w-8 h-8 text-gold" />
           </div>
           <h1 className="font-display text-4xl text-text-primary mb-2">Forgot <span className="text-gold italic">Password?</span></h1>
-          <p className="text-text-muted text-sm">Enter your email and we'll send you a recovery link.</p>
+          <p className="text-text-muted text-sm">Enter your email and we&apos;ll send you a recovery link.</p>
         </div>
 
         <Card className="p-8 bg-surface border-border-gold rounded-xl">

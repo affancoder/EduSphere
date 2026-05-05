@@ -26,7 +26,7 @@ export default function Navbar() {
       try {
         const res = await fetch("/api/auth/me");
         setIsLoggedIn(res.ok);
-      } catch (error) {
+      } catch {
         setIsLoggedIn(false);
       }
     };

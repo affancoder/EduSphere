@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { 
-  Layout, 
   Settings, 
   LogOut, 
   Loader2, 
@@ -12,9 +11,10 @@ import {
   Clock, 
   TrendingUp, 
   Search, 
-  Filter,
   CheckCircle2,
-  Circle
+  Circle,
+  BookOpen,
+  ArrowRight
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -32,11 +32,45 @@ interface User {
   profileImage?: string;
 }
 
+interface Course {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  level: string;
+  thumbnail: string;
+  totalLessons: number;
+  duration: number;
+  enrolledCount: number;
+}
+
+interface Progress {
+  _id: string;
+  courseId: string;
+  completedLessons: string[];
+  lastAccessed: string;
+  percentage: number;
+  totalLessons: number;
+}
+
+interface HistoryItem {
+  _id: string;
+  courseId: string;
+  courseName: string;
+  lessonName: string;
+  action: string;
+  timestamp: string;
+  completionStatus: string;
+  timeSpent: number;
+  createdAt: string;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [progress, setProgress] = useState<any[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [progress, setProgress] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -44,21 +78,24 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [userRes, historyRes, progressRes] = await Promise.all([
+        const [userRes, coursesRes, historyRes, progressRes] = await Promise.all([
           fetch("/api/auth/me"),
+          fetch("/api/courses"),
           fetch("/api/history"),
           fetch("/api/progress")
         ]);
 
-        const [userData, historyData, progressData] = await Promise.all([
+        const [userData, coursesData, historyData, progressData] = await Promise.all([
           userRes.json(),
+          coursesRes.json(),
           historyRes.json(),
           progressRes.json()
         ]);
 
         if (userRes.ok) setUser(userData.user);
-        if (historyRes.ok) setHistory(historyData.history);
-        if (progressRes.ok) setProgress(progressData.progress);
+        if (coursesRes.ok) setCourses(coursesData.courses || []);
+        if (historyRes.ok) setHistory(historyData.history || []);
+        if (progressRes.ok) setProgress(progressData.progress || []);
 
         if (!userRes.ok) router.push("/login");
       } catch (err) {
@@ -85,7 +122,7 @@ export default function DashboardPage() {
 
   const filteredHistory = useMemo(() => {
     return history.filter(item => {
-      const matchesSearch = item.courseName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (item.courseName || "").toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = statusFilter === "all" || item.completionStatus === statusFilter;
       return matchesSearch && matchesFilter;
     });
@@ -93,12 +130,12 @@ export default function DashboardPage() {
 
   const totalProgress = useMemo(() => {
     return progress.length > 0 
-      ? Math.round(progress.reduce((acc, curr) => acc + curr.percentage, 0) / progress.length)
+      ? Math.round(progress.reduce((acc, curr) => acc + (curr.percentage || 0), 0) / progress.length)
       : 0;
   }, [progress]);
 
   const totalLearningTime = useMemo(() => {
-    return history.reduce((acc, curr) => acc + curr.timeSpent, 0);
+    return history.reduce((acc, curr) => acc + (Number(curr.timeSpent) || 0), 0);
   }, [history]);
 
   if (loading) {
@@ -141,6 +178,65 @@ export default function DashboardPage() {
               </GoldButton>
             </div>
           </motion.div>
+
+          {/* Available Courses */}
+          <div className="mb-12">
+            <h2 className="font-display text-3xl text-text-primary mb-6">Available Courses</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map((course) => (
+                <motion.div
+                  key={course._id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                >
+                  <Card className="p-6 bg-surface border-border-gold hover:border-gold/30 transition-all h-full flex flex-col">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-gold">
+                          {course.category}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-text-muted">
+                          {course.level}
+                        </span>
+                      </div>
+                      <h3 className="font-display text-xl text-text-primary mb-2">
+                        {course.title}
+                      </h3>
+                      <p className="text-text-muted text-sm mb-4 line-clamp-2">
+                        {course.description}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-text-muted mb-4">
+                        <span className="flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" />
+                          {course.totalLessons} Lessons
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {course.duration} mins
+                        </span>
+                      </div>
+                    </div>
+                    <GoldButton
+                      variant="filled"
+                      onClick={() => router.push(`/course/${course._id}`)}
+                      className="w-full"
+                    >
+                      Continue Learning
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </GoldButton>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+            {courses.length === 0 && (
+              <Card className="p-12 text-center bg-surface border-border-gold border-dashed">
+                <BookOpen className="w-12 h-12 text-gold mx-auto mb-4" />
+                <p className="text-text-muted italic mb-2">No courses available yet.</p>
+                <p className="text-text-muted text-sm">Check back later for new content!</p>
+              </Card>
+            )}
+          </div>
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { 
   User, 
@@ -71,7 +72,7 @@ export default function SettingsPage() {
     fetchUser();
   }, [router]);
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (formData.password && formData.password !== formData.confirmPassword) {
       setMessage({ type: "error", text: "Passwords do not match" });
@@ -85,24 +86,19 @@ export default function SettingsPage() {
       const res = await fetch("/api/user/update", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          profileImage: formData.profileImage,
-          password: formData.password || undefined,
-        }),
+        body: JSON.stringify(formData),
       });
 
       const data = await res.json();
       if (res.ok) {
-        setUser(data.user);
         setMessage({ type: "success", text: "Profile updated successfully" });
+        setUser(data.user);
         setFormData(prev => ({ ...prev, password: "", confirmPassword: "" }));
       } else {
         setMessage({ type: "error", text: data.error || "Update failed" });
       }
-    } catch (err) {
-      console.error("Update error:", err);
+    } catch (_err) {
+      console.error("Update error:", _err);
       setMessage({ type: "error", text: "An unexpected error occurred" });
     } finally {
       setUpdating(false);
@@ -142,7 +138,13 @@ export default function SettingsPage() {
                   <div className="relative inline-block mb-6">
                     <div className="w-32 h-32 rounded-full bg-gold/10 border-2 border-gold/30 overflow-hidden flex items-center justify-center mx-auto">
                       {formData.profileImage ? (
-                        <img src={formData.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                        <Image 
+                          src={formData.profileImage} 
+                          alt="Profile" 
+                          width={128} 
+                          height={128} 
+                          className="w-full h-full object-cover" 
+                        />
                       ) : (
                         <User className="w-12 h-12 text-gold opacity-50" />
                       )}
