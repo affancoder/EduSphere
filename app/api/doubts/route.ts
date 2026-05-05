@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { verifyToken } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import Doubt from "@/models/Doubt";
 
@@ -6,97 +8,75 @@ import Doubt from "@/models/Doubt";
 export const dynamic = "force-dynamic";
 
 /**
- * GET API route to fetch doubts from the database.
- * Supports filtering by status via query parameter: ?status=pending
+ * GET API route to fetch user's doubts history from the database.
  */
 export async function GET(req: NextRequest) {
   try {
-    // 1. Get query parameters
-    const status = req.nextUrl.searchParams.get("status");
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
 
-    // 2. Establish database connection
-    await connectDB();
-
-    // 3. Build query object with proper typing
-    const query: { status?: string } = {};
-    if (status && ["pending", "understood"].includes(status)) {
-      query.status = status;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 4. Fetch recent doubts based on query
-    // Selecting only necessary fields for performance and limiting to 20 results
-    const doubts = await Doubt.find(query)
-      .select("question subject status createdAt")
+    const decoded: any = verifyToken(token);
+    await connectDB();
+
+    const doubts = await Doubt.find({ userId: decoded.id })
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
     
-    // 5. Return the doubts as a JSON array
-    return NextResponse.json(doubts, {
-      status: 200,
-      headers: {
-        "Cache-Control": "no-store, max-age=0",
-      },
-    });
+    return NextResponse.json({ doubts }, { status: 200 });
   } catch (error) {
     console.error("❌ Error fetching doubts (/api/doubts):", error);
-    
     return NextResponse.json(
-      { 
-        error: "Failed to fetch doubts from the database.",
-        message: error instanceof Error ? error.message : "Unknown error" 
-      },
+      { error: "Failed to fetch doubts." },
       { status: 500 }
     );
   }
 }
 
 /**
- * POST API route to create a new doubt.
- * Accepts: { question: string, subject: string }
+ * POST API route to create a new doubt with AI response.
  */
 export async function POST(req: NextRequest) {
   try {
-    // 1. Parse request body safely
-    let body;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid JSON in request body." },
-        { status: 400 }
-      );
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { question, subject } = body;
+    const decoded: any = verifyToken(token);
+    const { question, subject } = await req.json();
 
-    // 2. Validate input
     if (!question || typeof question !== "string" || question.trim() === "") {
       return NextResponse.json(
-        { error: "Question is required and cannot be empty." },
+        { error: "Question is required." },
         { status: 400 }
       );
     }
 
-    // 3. Connect to Database
+    // Mock AI Response for now
+    const mockAnswer = `AI Response to your question about ${subject || "General"}: \n\nRegarding your question: "${question}", here is a detailed explanation... [Mock AI Response]`;
+
     await connectDB();
 
-    // 4. Create new doubt
     const newDoubt = await Doubt.create({
+      userId: decoded.id,
       question: question.trim(),
+      answer: mockAnswer,
       subject: subject || "General",
       status: "pending",
     });
 
-    // 5. Return the created document
-    return NextResponse.json(newDoubt, { status: 201 });
+    return NextResponse.json({ doubt: newDoubt }, { status: 201 });
   } catch (error) {
     console.error("❌ Error creating doubt (/api/doubts):", error);
     return NextResponse.json(
-      { 
-        error: "An unexpected error occurred while creating the doubt.",
-        message: error instanceof Error ? error.message : "Unknown error" 
-      },
+      { error: "An unexpected error occurred." },
       { status: 500 }
     );
   }

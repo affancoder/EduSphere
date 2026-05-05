@@ -1,11 +1,10 @@
 import mongoose, { Schema, Document, model, models } from "mongoose";
 
 export interface IDoubt extends Document {
+  userId: mongoose.Types.ObjectId;
   question: string;
+  answer: string;
   subject?: string;
-  explanation?: string;
-  example?: string;
-  quiz?: string[];
   status: "pending" | "understood";
   createdAt: Date;
   updatedAt: Date;
@@ -13,24 +12,23 @@ export interface IDoubt extends Document {
 
 const DoubtSchema = new Schema<IDoubt>(
   {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     question: {
       type: String,
       required: [true, "Please provide a question"],
       trim: true,
     },
+    answer: {
+      type: String,
+      required: [true, "Please provide an answer"],
+    },
     subject: {
       type: String,
       trim: true,
-    },
-    explanation: {
-      type: String,
-    },
-    example: {
-      type: String,
-    },
-    quiz: {
-      type: [String],
-      default: [],
     },
     status: {
       type: String,

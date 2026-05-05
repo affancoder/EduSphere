@@ -14,7 +14,10 @@ import {
   CheckCircle2,
   Circle,
   BookOpen,
-  ArrowRight
+  ArrowRight,
+  MessageSquare,
+  Send,
+  History
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -65,37 +68,51 @@ interface HistoryItem {
   createdAt: string;
 }
 
+interface Doubt {
+  _id: string;
+  question: string;
+  answer: string;
+  subject: string;
+  createdAt: string;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);
+  const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Doubt State
+  const [newQuestion, setNewQuestion] = useState("");
+  const [askingDoubt, setAskingDoubt] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [userRes, coursesRes, historyRes, progressRes] = await Promise.all([
+        const [userRes, coursesRes, historyRes, progressRes, doubtsRes] = await Promise.all([
           fetch("/api/auth/me"),
           fetch("/api/courses"),
           fetch("/api/history"),
-          fetch("/api/progress")
+          fetch("/api/progress"),
+          fetch("/api/doubts")
         ]);
 
-        const [userData, coursesData, historyData, progressData] = await Promise.all([
-          userRes.json(),
-          coursesRes.json(),
-          historyRes.json(),
-          progressRes.json()
-        ]);
+        const userData = await userRes.json();
+        const coursesData = await coursesRes.json();
+        const historyData = await historyRes.json();
+        const progressData = await progressRes.json();
+        const doubtsData = await doubtsRes.json();
 
         if (userRes.ok) setUser(userData.user);
-        if (coursesRes.ok) setCourses(coursesData.courses || []);
+        if (coursesData.success) setCourses(coursesData.courses || []);
         if (historyRes.ok) setHistory(historyData.history || []);
         if (progressRes.ok) setProgress(progressData.progress || []);
+        if (doubtsRes.ok) setDoubts(doubtsData.doubts || []);
 
         if (!userRes.ok) router.push("/login");
       } catch (err) {
@@ -107,6 +124,29 @@ export default function DashboardPage() {
 
     fetchData();
   }, [router]);
+
+  const handleAskDoubt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newQuestion.trim()) return;
+
+    try {
+      setAskingDoubt(true);
+      const res = await fetch("/api/doubts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: newQuestion, subject: "General" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDoubts([data.doubt, ...doubts]);
+        setNewQuestion("");
+      }
+    } catch (err) {
+      console.error("Failed to ask doubt:", err);
+    } finally {
+      setAskingDoubt(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -238,35 +278,102 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
-            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
-              <div className="p-3 bg-orange-500/10 rounded-xl text-orange-500">
-                <Flame className="w-6 h-6" />
+          {/* AI Doubt System */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-12">
+            <div className="lg:col-span-2">
+              <h2 className="font-display text-3xl text-text-primary mb-6">Ask <span className="text-gold italic">AI Doubt</span></h2>
+              <Card className="p-6 bg-surface border-border-gold">
+                <form onSubmit={handleAskDoubt} className="space-y-4">
+                  <div className="relative">
+                    <MessageSquare className="absolute left-4 top-4 w-5 h-5 text-gold/50" />
+                    <textarea
+                      value={newQuestion}
+                      onChange={(e) => setNewQuestion(e.target.value)}
+                      placeholder="What are you struggling with today?"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-gold/50 transition-colors min-h-[120px] text-text-primary"
+                      required
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <GoldButton variant="filled" disabled={askingDoubt} className="px-8">
+                      {askingDoubt ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      {askingDoubt ? "Asking AI..." : "Solve Doubt"}
+                    </GoldButton>
+                  </div>
+                </form>
+              </Card>
+
+              <div className="mt-8 space-y-4">
+                <h3 className="font-display text-xl text-text-primary flex items-center gap-2">
+                  <History className="w-5 h-5 text-gold" />
+                  Recent Doubts
+                </h3>
+                {doubts.length > 0 ? (
+                  doubts.map((doubt) => (
+                    <motion.div
+                      key={doubt._id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                    >
+                      <Card className="p-6 bg-surface border-border-gold/30">
+                        <p className="text-xs font-bold text-gold uppercase tracking-widest mb-2">{doubt.subject}</p>
+                        <h4 className="text-text-primary font-medium mb-3">Q: {doubt.question}</h4>
+                        <div className="p-4 bg-white/5 rounded-lg border border-white/5">
+                          <p className="text-sm text-text-muted leading-relaxed whitespace-pre-wrap">
+                            <span className="text-gold font-bold">AI:</span> {doubt.answer}
+                          </p>
+                        </div>
+                        <p className="text-[10px] text-text-muted mt-3 text-right">
+                          {new Date(doubt.createdAt).toLocaleDateString()}
+                        </p>
+                      </Card>
+                    </motion.div>
+                  ))
+                ) : (
+                  <p className="text-text-muted italic text-sm p-8 text-center border border-dashed border-white/10 rounded-xl">
+                    No doubts asked yet. Start by asking your first question!
+                  </p>
+                )}
               </div>
-              <div>
-                <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Learning Streak</p>
-                <p className="text-2xl font-display">{user?.streak || 0} Days</p>
+            </div>
+
+            <div className="lg:col-span-1">
+              {/* Quick Stats (Moved here for better layout) */}
+              <div className="space-y-6">
+                <h2 className="font-display text-3xl text-text-primary mb-6">Stats</h2>
+                <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+                  <div className="p-3 bg-orange-500/10 rounded-xl text-orange-500">
+                    <Flame className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Learning Streak</p>
+                    <p className="text-2xl font-display">{user?.streak || 0} Days</p>
+                  </div>
+                </Card>
+                <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+                  <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Total Time</p>
+                    <p className="text-2xl font-display">{totalLearningTime} Mins</p>
+                  </div>
+                </Card>
+                <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+                  <div className="p-3 bg-gold/10 rounded-xl text-gold">
+                    <TrendingUp className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Overall Progress</p>
+                    <p className="text-2xl font-display">{totalProgress}%</p>
+                  </div>
+                </Card>
               </div>
-            </Card>
-            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
-              <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
-                <Clock className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Total Time</p>
-                <p className="text-2xl font-display">{totalLearningTime} Mins</p>
-              </div>
-            </Card>
-            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
-              <div className="p-3 bg-gold/10 rounded-xl text-gold">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Overall Progress</p>
-                <p className="text-2xl font-display">{totalProgress}%</p>
-              </div>
-            </Card>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -344,7 +451,7 @@ export default function DashboardPage() {
                       />
                     </div>
                     <p className="text-[10px] text-text-muted mt-3 uppercase tracking-widest font-bold">
-                      {course.completedLessons} / {course.totalLessons} Lessons Completed
+                      {course.completedLessons.length} / {course.totalLessons} Lessons Completed
                     </p>
                   </Card>
                 ))}
