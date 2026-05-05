@@ -70,15 +70,18 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const loggedIn = typeof window !== "undefined" && !!localStorage.getItem("admin_logged_in");
+    const checkAuth = () => {
+      const loggedIn = typeof window !== "undefined" && localStorage.getItem("admin_logged_in") === "true";
       
       if (!loggedIn) {
         setIsAuthenticated(false);
         router.push("/admin/login");
       } else {
         setIsAuthenticated(true);
-        await Promise.all([fetchDoubts(), fetchStats()]);
+        // Using Promise.all for parallel fetching
+        Promise.all([fetchDoubts(), fetchStats()]).catch(err => {
+          console.error("Dashboard initial load failed:", err);
+        });
       }
     };
     

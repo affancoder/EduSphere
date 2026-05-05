@@ -3,27 +3,47 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LogIn, Mail, Key } from "lucide-react";
+import { LogIn, Mail, Key, Loader2, AlertCircle } from "lucide-react";
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Simple mock login
-    setTimeout(() => {
-      localStorage.setItem("isLoggedIn", "true");
+    setError(null);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        // Successful login
+        localStorage.setItem("isLoggedIn", "true");
+        router.push("/dashboard");
+        router.refresh();
+      } else {
+        setError(data.error || "Login failed. Please check your credentials.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
       setLoading(false);
-      window.location.href = "/dashboard";
-    }, 1000);
+    }
   };
 
   return (
@@ -43,6 +63,17 @@ export default function LoginPage() {
 
         <Card className="p-8 bg-surface border-border-gold rounded-xl">
           <form onSubmit={handleLogin} className="space-y-6">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500"
+              >
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p className="text-sm font-medium">{error}</p>
+              </motion.div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gold mb-2 tracking-widest uppercase">
                 Email Address
@@ -51,8 +82,8 @@ export default function LoginPage() {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-gold/50 transition-colors text-text-primary"
                   placeholder="your@email.com"
                   required
@@ -68,8 +99,8 @@ export default function LoginPage() {
                 <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-gold/50 transition-colors text-text-primary"
                   placeholder="••••••••"
                   required
@@ -77,8 +108,15 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <GoldButton className="w-full py-4 text-base" variant="filled">
-              {loading ? "Authenticating..." : "Login to Sanctuary"}
+            <GoldButton className="w-full py-4 text-base" variant="filled" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                "Login to Sanctuary"
+              )}
             </GoldButton>
           </form>
 

@@ -1,194 +1,240 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { 
-  MessageSquare, 
-  CheckCircle2, 
+  Layout, 
+  Settings, 
+  LogOut, 
+  Loader2, 
+  Flame, 
   Clock, 
   TrendingUp, 
-  ChevronRight,
-  ArrowUpRight
+  Search, 
+  Filter,
+  CheckCircle2,
+  Circle
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import Footer from "../../components/Footer";
 import Card from "@/components/ui/Card";
-
-const statsData = {
-  total: 12,
-  understood: 8,
-  pending: 4,
-};
-
-const recentDoubts = [
-  {
-    title: "Closure in JavaScript",
-    subject: "JavaScript",
-    date: "2 hours ago",
-    status: "Understood",
-  },
-  {
-    title: "QuickSort vs MergeSort",
-    subject: "DSA",
-    date: "5 hours ago",
-    status: "Pending",
-  },
-  {
-    title: "useEffect Cleanup Function",
-    subject: "React",
-    date: "Yesterday",
-    status: "Understood",
-  },
-];
+import GoldButton from "@/components/ui/GoldButton";
+import Link from "next/link";
 
 export default function DashboardPage() {
-  // TODO: Fetch from /api/doubts
-  // TODO: Replace dummy data with DB data
-  const { total, understood, pending } = statsData;
-  const progressValue = Math.round((understood / total) * 100);
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [progress, setProgress] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const statsCards = [
-    {
-      label: "Total Doubts",
-      value: total,
-      icon: <MessageSquare className="w-6 h-6 text-[#d4af37]" />,
-      trend: "All time requests",
-    },
-    {
-      label: "Understood",
-      value: understood,
-      icon: <CheckCircle2 className="w-6 h-6 text-emerald-500" />,
-      trend: `${progressValue}% completion`,
-    },
-    {
-      label: "Pending",
-      value: pending,
-      icon: <Clock className="w-6 h-6 text-amber-500" />,
-      trend: "Awaiting review",
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [userRes, historyRes, progressRes] = await Promise.all([
+          fetch("/api/auth/me"),
+          fetch("/api/history"),
+          fetch("/api/progress")
+        ]);
+
+        const [userData, historyData, progressData] = await Promise.all([
+          userRes.json(),
+          historyRes.json(),
+          progressRes.json()
+        ]);
+
+        if (userRes.ok) setUser(userData.user);
+        if (historyRes.ok) setHistory(historyData.history);
+        if (progressRes.ok) setProgress(progressData.progress);
+
+        if (!userRes.ok) router.push("/login");
+      } catch (err) {
+        console.error("Dashboard fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [router]);
+
+  const handleLogout = async () => {
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (res.ok) {
+        localStorage.removeItem("isLoggedIn");
+        window.location.href = "/";
+      }
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
+  const filteredHistory = history.filter(item => {
+    const matchesSearch = item.courseName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = statusFilter === "all" || item.completionStatus === statusFilter;
+    return matchesSearch && matchesFilter;
+  });
+
+  const totalProgress = progress.length > 0 
+    ? Math.round(progress.reduce((acc, curr) => acc + curr.percentage, 0) / progress.length)
+    : 0;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-gold animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0b0b0f] text-text-primary font-body">
+    <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-
-      <main className="container mx-auto px-6 pt-32 pb-20">
-        {/* Page Header */}
-        <div className="mb-12">
-          <motion.h1
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="font-display text-4xl md:text-5xl text-text-primary mb-2"
+      
+      <main className="flex-1 container mx-auto px-6 pt-32 pb-20">
+        <div className="max-w-6xl mx-auto">
+          {/* Welcome Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12"
           >
-            Your Learning <span className="text-[#d4af37] italic">Dashboard</span>
-          </motion.h1>
-          <p className="text-text-muted">Welcome back, track your progress and insights here.</p>
-        </div>
+            <div>
+              <h1 className="font-display text-4xl md:text-5xl text-text-primary mb-2">
+                Welcome back, <span className="text-gold italic">{user?.name}</span>
+              </h1>
+              <p className="text-text-muted">Last login: {new Date(user?.lastLogin).toLocaleDateString()}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/settings">
+                <GoldButton variant="ghost">
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </GoldButton>
+              </Link>
+              <GoldButton variant="filled" onClick={handleLogout}>
+                <LogOut className="w-4 h-4" />
+                Logout
+              </GoldButton>
+            </div>
+          </motion.div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {statsCards.map((stat, i) => (
-            <Card key={i} className="p-6 bg-white/5 backdrop-blur-xl border-white/10 rounded-xl group hover:border-[#d4af37]/30 transition-all duration-300">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-white/5 border border-white/10 group-hover:bg-[#d4af37]/10 transition-colors">
-                  {stat.icon}
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+              <div className="p-3 bg-orange-500/10 rounded-xl text-orange-500">
+                <Flame className="w-6 h-6" />
               </div>
-              <h3 className="text-text-muted text-sm tracking-widest uppercase mb-1">{stat.label}</h3>
-              <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-display text-text-primary">{stat.value}</span>
-                <span className="text-xs text-[#d4af37]/60">{stat.trend}</span>
+              <div>
+                <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Learning Streak</p>
+                <p className="text-2xl font-display">{user?.streak || 0} Days</p>
               </div>
             </Card>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Progress Section */}
-          <div className="lg:col-span-1">
-            <Card className="p-8 h-full bg-white/5 backdrop-blur-xl border-white/10 rounded-xl">
-              <div className="flex items-center gap-3 mb-8">
-                <TrendingUp className="w-5 h-5 text-[#d4af37]" />
-                <h3 className="font-display text-2xl">Learning Progress</h3>
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+              <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+                <Clock className="w-6 h-6" />
               </div>
-              
-              <div className="relative pt-1">
-                <div className="flex mb-4 items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-[#d4af37] bg-[#d4af37]/10">
-                      Overall Mastery
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-semibold inline-block text-[#d4af37]">
-                      {progressValue}%
-                    </span>
-                  </div>
-                </div>
-                <div className="overflow-hidden h-2 mb-8 text-xs flex rounded-full bg-white/5 border border-white/5">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progressValue}%` }}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
-                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-linear-to-r from-[#d4af37]/40 to-[#d4af37]"
-                  ></motion.div>
-                </div>
+              <div>
+                <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Total Time</p>
+                <p className="text-2xl font-display">{history.reduce((acc, curr) => acc + curr.timeSpent, 0)} Mins</p>
               </div>
-
-              <ul className="space-y-4">
-                <li className="flex items-center justify-between text-sm">
-                  <span className="text-text-muted">Understood Doubts</span>
-                  <span className="text-text-primary font-semibold">{understood}</span>
-                </li>
-                <li className="flex items-center justify-between text-sm">
-                  <span className="text-text-muted">Pending Review</span>
-                  <span className="text-text-primary font-semibold">{pending}</span>
-                </li>
-                <li className="flex items-center justify-between text-sm">
-                  <span className="text-text-muted">Total Activity</span>
-                  <span className="text-text-primary font-semibold">{total}</span>
-                </li>
-              </ul>
+            </Card>
+            <Card className="p-6 bg-surface border-border-gold flex items-center gap-4">
+              <div className="p-3 bg-gold/10 rounded-xl text-gold">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-text-muted text-xs uppercase tracking-widest font-bold">Overall Progress</p>
+                <p className="text-2xl font-display">{totalProgress}%</p>
+              </div>
             </Card>
           </div>
 
-          {/* Recent Activity Section */}
-          <div className="lg:col-span-2">
-            <Card className="p-8 h-full bg-white/5 backdrop-blur-xl border-white/10 rounded-xl">
-              <div className="flex items-center justify-between mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            {/* Learning History */}
+            <div className="lg:col-span-2">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display text-3xl text-text-primary">Learning History</h2>
                 <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-[#d4af37]" />
-                  <h3 className="font-display text-2xl">Recent Activity</h3>
+                  <div className="relative hidden sm:block">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                    <input 
+                      type="text"
+                      placeholder="Search courses..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="bg-surface border border-border-gold rounded-lg pl-9 pr-4 py-2 text-xs text-text-primary focus:outline-none focus:border-gold/50"
+                    />
+                  </div>
+                  <select 
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="bg-surface border border-border-gold rounded-lg px-3 py-2 text-xs text-text-primary focus:outline-none"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="in-progress">In Progress</option>
+                  </select>
                 </div>
-                <button className="text-xs tracking-widest uppercase text-[#d4af37] hover:text-champagne transition-colors flex items-center gap-1">
-                  View All <ChevronRight className="w-3 h-3" />
-                </button>
               </div>
 
               <div className="space-y-4">
-                {recentDoubts.map((activity, i) => (
-                  <div 
-                    key={i}
-                    className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-[#d4af37]/10 hover:bg-white/[0.07] transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-2 h-2 rounded-full ${activity.status === 'Understood' ? 'bg-emerald-500' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`} />
-                      <div>
-                        <h4 className="text-text-primary font-medium group-hover:text-[#d4af37] transition-colors">{activity.title}</h4>
-                        <div className="flex gap-3 text-xs text-text-muted mt-1">
-                          <span>{activity.subject}</span>
-                          <span>•</span>
-                          <span>{activity.date}</span>
+                {filteredHistory.length > 0 ? (
+                  filteredHistory.map((item) => (
+                    <Card key={item._id} className="p-6 bg-surface border-border-gold hover:border-gold/30 transition-all">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-gold text-[10px] uppercase tracking-widest font-bold mb-1">{item.courseName}</p>
+                          <h4 className="text-text-primary font-display text-xl mb-1">{item.lessonName}</h4>
+                          <div className="flex items-center gap-4 text-xs text-text-muted">
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {item.timeSpent} mins</span>
+                            <span className="flex items-center gap-1">
+                              {item.completionStatus === 'completed' ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Circle className="w-3 h-3 text-amber-500" />}
+                              {item.completionStatus}
+                            </span>
+                          </div>
                         </div>
+                        <span className="text-[10px] text-text-muted font-bold">{new Date(item.createdAt).toLocaleDateString()}</span>
                       </div>
+                    </Card>
+                  ))
+                ) : (
+                  <Card className="p-12 text-center bg-surface border-border-gold border-dashed">
+                    <p className="text-text-muted italic">No history found matching your criteria.</p>
+                  </Card>
+                )}
+              </div>
+            </div>
+
+            {/* Progress Track */}
+            <div>
+              <h2 className="font-display text-3xl text-text-primary mb-6">Course Progress</h2>
+              <div className="space-y-6">
+                {progress.map((course) => (
+                  <Card key={course._id} className="p-6 bg-surface border-border-gold">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-display text-xl text-text-primary">{course.courseId}</h4>
+                      <span className="text-gold font-bold text-sm">{course.percentage}%</span>
                     </div>
-                    <span className={`text-[10px] tracking-widest uppercase px-3 py-1 rounded-full border ${activity.status === 'Understood' ? 'border-emerald-500/20 text-emerald-500 bg-emerald-500/5' : 'border-amber-500/20 text-amber-500 bg-amber-500/5'}`}>
-                      {activity.status}
-                    </span>
-                  </div>
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${course.percentage}%` }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="h-full bg-gold shadow-[0_0_10px_rgba(201,168,76,0.3)]"
+                      />
+                    </div>
+                    <p className="text-[10px] text-text-muted mt-3 uppercase tracking-widest font-bold">
+                      {course.completedLessons} / {course.totalLessons} Lessons Completed
+                    </p>
+                  </Card>
                 ))}
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </main>

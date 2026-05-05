@@ -37,11 +37,18 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("admin_logged_in");
-    setIsLoggedIn(false);
-    window.location.href = "/";
+  const handleLogout = async () => {
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (res.ok) {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("admin_logged_in");
+        setIsLoggedIn(false);
+        window.location.href = "/";
+      }
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
   };
 
   return (
