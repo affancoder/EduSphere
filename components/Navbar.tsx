@@ -21,15 +21,20 @@ export default function Navbar() {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Check for login status (could be extended to use a real auth context later)
-    const checkLoginStatus = () => {
-      const loggedIn = localStorage.getItem("isLoggedIn") === "true" || 
-                      localStorage.getItem("admin_logged_in") === "true";
-      setIsLoggedIn(loggedIn);
+    // Check for login status using JWT token
+    const checkLoginStatus = async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        setIsLoggedIn(res.ok);
+      } catch (error) {
+        setIsLoggedIn(false);
+      }
     };
 
     checkLoginStatus();
-    
+  }, [pathname]);
+
+  useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };

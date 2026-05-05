@@ -125,7 +125,8 @@ export default function DashboardPage() {
               <h1 className="font-display text-4xl md:text-5xl text-text-primary mb-2">
                 Welcome back, <span className="text-gold italic">{user?.name}</span>
               </h1>
-              <p className="text-text-muted">Last login: {user?.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "First time logging in"}</p>
+              <p className="text-text-muted">{user?.email}</p>
+              <p className="text-text-muted text-sm">Last login: {user?.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "First time logging in"}</p>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/settings">
