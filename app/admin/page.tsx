@@ -16,7 +16,7 @@ import {
 import Card from "@/components/ui/Card";
 import GoldButton from "@/components/ui/GoldButton";
 
-interface Doubt {
+export interface Doubt {
   _id: string;
   question: string;
   subject?: string;
@@ -34,6 +34,7 @@ export default function AdminDashboard() {
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "understood">("all");
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
@@ -45,6 +46,7 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok) {
         setDoubts(data);
+        setLastUpdated(new Date());
       } else {
         setError(data.error || "Failed to fetch doubts");
       }
@@ -70,6 +72,7 @@ export default function AdminDashboard() {
 
   const handleUpdateStatus = async (id: string, newStatus: "pending" | "understood") => {
     setProcessingIds(prev => new Set(prev).add(id));
+    setError(null);
     try {
       const res = await fetch(`/api/doubts/${id}`, {
         method: "PATCH",
@@ -78,9 +81,13 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setDoubts(prev => prev.map(d => d._id === id ? { ...d, status: newStatus } : d));
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to update status");
       }
     } catch (err) {
       console.error("Update failed:", err);
+      setError("Failed to connect to server. Check your connection.");
     } finally {
       setProcessingIds(prev => {
         const next = new Set(prev);
@@ -93,13 +100,18 @@ export default function AdminDashboard() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this doubt?")) return;
     setProcessingIds(prev => new Set(prev).add(id));
+    setError(null);
     try {
       const res = await fetch(`/api/doubts/${id}`, { method: "DELETE" });
       if (res.ok) {
         setDoubts(prev => prev.filter(d => d._id !== id));
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to delete doubt");
       }
     } catch (err) {
       console.error("Delete failed:", err);
+      setError("Failed to connect to server. Check your connection.");
     } finally {
       setProcessingIds(prev => {
         const next = new Set(prev);
@@ -161,6 +173,12 @@ export default function AdminDashboard() {
           </div>
           
           <div className="flex items-center gap-4">
+            <div className="hidden sm:flex flex-col items-end text-[10px] text-text-muted font-bold tracking-widest uppercase">
+              <span>Last Sync</span>
+              <span className="text-[#d4af37]">
+                {lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+              </span>
+            </div>
             <button 
               onClick={() => fetchDoubts()}
               disabled={loading}
@@ -257,13 +275,28 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-white/5">
                 <AnimatePresence mode="popLayout">
                   {isInitialLoading ? (
-                    [...Array(5)].map((_, i) => (
-                      <tr key={`skeleton-${i}`} className="animate-pulse">
-                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-3/4"></div></td>
-                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-20"></div></td>
-                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-24"></div></td>
-                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-16"></div></td>
-                        <td className="px-6 py-6"><div className="h-4 bg-white/10 rounded w-20 ml-auto"></div></td>
+                    [...Array(6)].map((_, i) => (
+                      <tr key={`skeleton-${i}`} className="animate-pulse border-b border-white/5 last:border-0">
+                        <td className="px-6 py-5">
+                          <div className="flex flex-col gap-2">
+                            <div className="h-4 bg-white/10 rounded w-3/4"></div>
+                            <div className="h-3 bg-white/5 rounded w-1/2"></div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5"><div className="h-6 bg-white/10 rounded-md w-16"></div></td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-white/10"></div>
+                            <div className="h-3 bg-white/10 rounded w-16"></div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5"><div className="h-4 bg-white/10 rounded w-20"></div></td>
+                        <td className="px-6 py-5 text-right">
+                          <div className="flex justify-end gap-2">
+                            <div className="w-8 h-8 bg-white/10 rounded-lg"></div>
+                            <div className="w-8 h-8 bg-white/10 rounded-lg"></div>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : filteredDoubts.length > 0 ? (

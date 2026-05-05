@@ -36,3 +36,44 @@ export async function GET() {
     );
   }
 }
+
+/**
+ * POST API route to create a new doubt.
+ * Accepts: { question: string, subject: string }
+ */
+export async function POST(req: Request) {
+  try {
+    // 1. Parse request body
+    const { question, subject } = await req.json();
+
+    // 2. Validate input
+    if (!question || typeof question !== "string" || question.trim() === "") {
+      return NextResponse.json(
+        { error: "Question is required and cannot be empty." },
+        { status: 400 }
+      );
+    }
+
+    // 3. Connect to Database
+    await connectDB();
+
+    // 4. Create new doubt
+    const newDoubt = await Doubt.create({
+      question: question.trim(),
+      subject: subject || "General",
+      status: "pending",
+    });
+
+    // 5. Return the created document
+    return NextResponse.json(newDoubt, { status: 201 });
+  } catch (error: any) {
+    console.error("❌ Error creating doubt (/api/doubts):", error);
+    return NextResponse.json(
+      { 
+        error: "An unexpected error occurred while creating the doubt.",
+        message: error.message 
+      },
+      { status: 500 }
+    );
+  }
+}
