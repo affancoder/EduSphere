@@ -16,8 +16,8 @@ const ProgressSchema = new mongoose.Schema(
       required: true,
     },
     completedLessons: {
-      type: Number,
-      default: 0,
+      type: [String],
+      default: [],
     },
     percentage: {
       type: Number,
@@ -30,7 +30,7 @@ const ProgressSchema = new mongoose.Schema(
 // Auto-calculate percentage before saving
 ProgressSchema.pre("save", function (next) {
   if (this.totalLessons && this.totalLessons > 0) {
-    const calc = (this.completedLessons / this.totalLessons) * 100;
+    const calc = (this.completedLessons.length / this.totalLessons) * 100;
     this.percentage = Math.min(100, Math.max(0, Math.round(calc)));
   } else {
     this.percentage = 0;

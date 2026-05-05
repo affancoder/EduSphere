@@ -40,24 +40,34 @@ export default function CoursePage() {
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const fetchCourse = async () => {
+    const fetchCourseData = async () => {
       try {
-        const res = await fetch(`/api/course/${params.id}`);
-        const data = await res.json();
-        if (res.ok) {
-          setCourse(data.course);
-          setLessons(data.lessons);
+        const [courseRes, progressRes] = await Promise.all([
+          fetch(`/api/courses/${params.id}`),
+          fetch(`/api/progress/course/${params.id}`)
+        ]);
+
+        const courseData = await courseRes.json();
+        const progressData = await progressRes.json();
+
+        if (courseRes.ok) {
+          setCourse(courseData.course);
+          setLessons(courseData.lessons);
         } else {
-          setError(data.error || "Failed to load course");
+          setError(courseData.error || "Failed to load course");
+        }
+
+        if (progressRes.ok && progressData.progress) {
+          setCompletedLessons(new Set(progressData.progress.completedLessons));
         }
       } catch (error) {
-        console.error("Failed to fetch course:", error);
+        console.error("Failed to fetch course data:", error);
         setError("Network error. Please try again.");
       } finally {
         setLoading(false);
       }
     };
-    fetchCourse();
+    fetchCourseData();
   }, [params.id]);
 
   const handleLessonClick = (lessonId: string) => {

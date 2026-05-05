@@ -83,7 +83,7 @@ export default function SettingsPage() {
     setMessage(null);
 
     try {
-      const res = await fetch("/api/user/update", {
+      const res = await fetch("/api/users/update", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

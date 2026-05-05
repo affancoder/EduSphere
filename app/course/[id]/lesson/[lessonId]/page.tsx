@@ -30,27 +30,22 @@ export default function LessonPage() {
   const params = useParams();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [totalLessons, setTotalLessons] = useState(0);
+  const [prevLessonId, setPrevLessonId] = useState<string | null>(null);
+  const [nextLessonId, setNextLessonId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchLesson = async () => {
       try {
-        const res = await fetch(`/api/course/${params.id}`);
+        const res = await fetch(`/api/lessons/${params.lessonId}`);
         const data = await res.json();
         if (res.ok) {
-          setCourse(data.course);
-          setLessons(data.lessons);
-          const currentLesson = data.lessons.find((l: Lesson) => l._id === params.lessonId);
-          if (currentLesson) {
-            setLesson(currentLesson);
-            setIsCompleted(currentLesson.isCompleted);
-          } else {
-            setError("Lesson not found");
-          }
+          setLesson(data.lesson);
+          setCourse({ _id: params.id as string, title: data.courseTitle });
+          setIsCompleted(data.lesson.isCompleted);
+          setTotalLessons(data.totalLessons);
+          setPrevLessonId(data.prevLessonId);
+          setNextLessonId(data.nextLessonId);
         } else {
           setError(data.error || "Failed to load lesson");
         }
@@ -68,50 +63,40 @@ export default function LessonPage() {
     try {
       setIsSaving(true);
       const newCompletedStatus = !isCompleted;
-      setIsCompleted(newCompletedStatus);
-
-      const completedCount = lessons.filter((l) => 
-        l._id === params.lessonId ? newCompletedStatus : l.isCompleted
-      ).length;
-
+      
       const res = await fetch("/api/progress/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           courseId: params.id,
-          completedLessons: completedCount,
-          totalLessons: lessons.length,
+          lessonId: params.lessonId,
+          completed: newCompletedStatus,
         }),
       });
 
-      if (!res.ok) {
-        setIsCompleted(!newCompletedStatus);
+      if (res.ok) {
+        setIsCompleted(newCompletedStatus);
       }
     } catch (error) {
       console.error("Failed to update progress:", error);
-      setIsCompleted(!isCompleted);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handlePrevious = () => {
-    const currentIndex = lessons.findIndex((l) => l._id === params.lessonId);
-    if (currentIndex > 0) {
-      router.push(`/course/${params.id}/lesson/${lessons[currentIndex - 1]._id}`);
+    if (prevLessonId) {
+      router.push(`/course/${params.id}/lesson/${prevLessonId}`);
     }
   };
 
   const handleNext = () => {
-    const currentIndex = lessons.findIndex((l) => l._id === params.lessonId);
-    if (currentIndex < lessons.length - 1) {
-      router.push(`/course/${params.id}/lesson/${lessons[currentIndex + 1]._id}`);
+    if (nextLessonId) {
+      router.push(`/course/${params.id}/lesson/${nextLessonId}`);
     } else {
       router.push(`/course/${params.id}`);
     }
   };
-
-  const currentIndex = lessons.findIndex((l) => l._id === params.lessonId);
 
   if (loading) {
     return (
@@ -187,7 +172,7 @@ export default function LessonPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-gold text-xs uppercase tracking-widest font-bold mb-2">
-                  Lesson {lesson.order} of {lessons.length}
+                  Lesson {lesson.order} of {totalLessons}
                 </p>
                 <h1 className="font-display text-3xl md:text-4xl text-text-primary mb-2">
                   {lesson.title}
@@ -210,12 +195,21 @@ export default function LessonPage() {
           >
             <Card className="p-8 bg-surface border-border-gold mb-8">
               {lesson.videoUrl && (
-                <div className="mb-6">
-                  <video
-                    src={lesson.videoUrl}
-                    controls
-                    className="w-full rounded-lg"
-                  />
+                <div className="mb-6 aspect-video">
+                  {lesson.videoUrl.includes("youtube.com") || lesson.videoUrl.includes("youtu.be") ? (
+                    <iframe
+                      src={lesson.videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                      className="w-full h-full rounded-lg"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      src={lesson.videoUrl}
+                      controls
+                      className="w-full h-full rounded-lg"
+                    />
+                  )}
                 </div>
               )}
               <div className="prose prose-invert max-w-none">
@@ -236,7 +230,7 @@ export default function LessonPage() {
             <GoldButton
               variant="ghost"
               onClick={handlePrevious}
-              disabled={currentIndex === 0}
+              disabled={!prevLessonId}
               className="flex-1"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -262,7 +256,7 @@ export default function LessonPage() {
               onClick={handleNext}
               className="flex-1"
             >
-              {currentIndex === lessons.length - 1 ? "Finish Course" : "Next"}
+              {!nextLessonId ? "Finish Course" : "Next"}
               <ArrowRight className="w-4 h-4 ml-2" />
             </GoldButton>
           </motion.div>

@@ -14,22 +14,28 @@ export async function POST(req: Request) {
     }
 
     const decoded: any = verifyToken(token);
-    const { courseId, completedLessons, totalLessons } = await req.json();
+    const { courseId, lessonId, completed, totalLessons } = await req.json();
 
     await connectDB();
 
     let progress = await Progress.findOne({ userId: decoded.id, courseId });
 
     if (progress) {
-      progress.completedLessons = completedLessons;
+      const lessonSet = new Set(progress.completedLessons);
+      if (completed) {
+        lessonSet.add(lessonId);
+      } else {
+        lessonSet.delete(lessonId);
+      }
+      progress.completedLessons = Array.from(lessonSet);
       if (totalLessons) progress.totalLessons = totalLessons;
       await progress.save();
     } else {
       progress = await Progress.create({
         userId: decoded.id,
         courseId,
-        completedLessons,
-        totalLessons,
+        completedLessons: completed ? [lessonId] : [],
+        totalLessons: totalLessons || 0,
       });
     }
 
