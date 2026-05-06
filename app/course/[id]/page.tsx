@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { BookOpen, Clock, CheckCircle2, Circle, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -36,14 +36,21 @@ interface Course {
   }>;
 }
 
+interface UserProfile {
+  _id: string;
+  purchasedCourses?: string[];
+}
+
 export default function CoursePage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const courseId = String(params.id);
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [access, setAccess] = useState<{
     allowed: boolean;
@@ -57,9 +64,9 @@ export default function CoursePage() {
     const fetchCourseData = async () => {
       try {
         const [courseRes, progressRes, accessRes, userRes] = await Promise.all([
-          fetch(`/api/courses/${params.id}`),
-          fetch(`/api/progress/course/${params.id}`),
-          fetch(`/api/course/access/${params.id}`),
+          fetch(`/api/courses/${courseId}`),
+          fetch(`/api/progress/course/${courseId}`),
+          fetch(`/api/course/access/${courseId}`),
           fetch("/api/auth/me"),
         ]);
 
@@ -86,6 +93,33 @@ export default function CoursePage() {
         if (progressRes.ok && progressData.progress) {
           setCompletedLessons(new Set(progressData.progress.completedLessons));
         }
+
+        if (searchParams.get("success") === "true" && !accessData?.allowed) {
+          for (let attempt = 0; attempt < 5; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            const [nextAccessRes, nextUserRes] = await Promise.all([
+              fetch(`/api/course/access/${courseId}`, { cache: "no-store" }),
+              fetch("/api/auth/me", { cache: "no-store" }),
+            ]);
+
+            const nextAccessData = await nextAccessRes.json();
+            const nextUserData = await nextUserRes.json();
+
+            const hasPurchasedCourse = Array.isArray(nextUserData.user?.purchasedCourses)
+              && nextUserData.user.purchasedCourses.some(
+                (id: string) => String(id) === courseId
+              );
+
+            if (nextAccessData?.allowed || hasPurchasedCourse) {
+              setAccess(nextAccessData);
+              if (nextUserRes.ok) {
+                setUser(nextUserData.user);
+              }
+              break;
+            }
+          }
+        }
       } catch (error) {
         console.error("Failed to fetch course data:", error);
         setError("Network error. Please try again.");
@@ -94,7 +128,7 @@ export default function CoursePage() {
       }
     };
     fetchCourseData();
-  }, [params.id]);
+  }, [courseId, searchParams]);
 
   const handleLessonClick = (lessonId: string) => {
     router.push(`/course/${params.id}/lesson/${lessonId}`);
@@ -109,7 +143,7 @@ export default function CoursePage() {
       const res = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId: params.id }),
+        body: JSON.stringify({ courseId }),
       });
       const data = await res.json();
       
@@ -182,8 +216,9 @@ export default function CoursePage() {
   }
 
   if (access?.category === "premium" && !access.allowed) {
-    // Double check with user data if available
-    const isPurchased = user?.purchasedCourses?.includes(params.id);
+    const isPurchased = user?.purchasedCourses?.some(
+      (id) => String(id) === courseId
+    );
     
     if (!isPurchased) {
       return (

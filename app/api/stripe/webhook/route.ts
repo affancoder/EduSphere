@@ -4,62 +4,89 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 import Subscription from "@/models/Subscription";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+if (!stripeSecretKey) {
+  console.error("CRITICAL: STRIPE_SECRET_KEY is missing from environment variables (Webhook)");
+}
+
+const stripe = new Stripe(stripeSecretKey || "", {
+  apiVersion: "2026-04-22.dahlia",
+});
 
 export async function POST(req: Request) {
   console.log("🚀 WEBHOOK HIT");
 
-  await connectDB();
-
   const body = await req.text();
-  const sig = req.headers.get("stripe-signature")!;
+  const signature = req.headers.get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  let event;
+  if (!signature) {
+    console.error("Stripe Webhook: No stripe-signature header found");
+    return NextResponse.json({ error: "No signature" }, { status: 400 });
+  }
+
+  if (!webhookSecret) {
+    console.error("CRITICAL: STRIPE_WEBHOOK_SECRET is missing from environment variables");
+    return NextResponse.json({ error: "Webhook secret missing" }, { status: 500 });
+  }
+
+  let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    console.log(`Stripe Webhook: Received event type: ${event.type}`);
   } catch (err: unknown) {
-    console.error("Webhook Error:", err instanceof Error ? err.message : err);
-    return new Response("Webhook Error", { status: 400 });
+    console.error(
+      `Stripe Webhook: Signature verification failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+    return NextResponse.json({ error: "Webhook Error" }, { status: 400 });
   }
 
   if (event.type === "checkout.session.completed") {
-    const session: unknown = event.data.object;
+    const session = event.data.object as Stripe.Checkout.Session;
+    const userId = session.metadata?.userId;
+    const courseId = session.metadata?.courseId;
 
-    console.log("METADATA:", (session as Stripe.Checkout.Session).metadata);
-
-    const userId = (session as Stripe.Checkout.Session).metadata?.userId;
-    const courseId = (session as Stripe.Checkout.Session).metadata?.courseId;
+    console.log("USER:", userId);
+    console.log("COURSE:", courseId);
 
     if (!userId || !courseId) {
-      console.log("❌ Missing metadata");
+      console.warn("Stripe Webhook: Missing userId or courseId in session metadata");
       return NextResponse.json({ received: true });
     }
 
     try {
-      // 🔓 Unlock course
+      await connectDB();
+
       await User.findByIdAndUpdate(userId, {
         $addToSet: { purchasedCourses: courseId },
       });
 
-      // 💰 Save transaction
-      await Subscription.create({
-        userId,
-        courseId,
-        amount: (session as Stripe.Checkout.Session).amount_total! / 100,
-        status: "paid",
-        stripeSessionId: (session as Stripe.Checkout.Session).id,
-        createdAt: new Date(),
-      });
+      await Subscription.updateOne(
+        { stripeSessionId: session.id },
+        {
+          $setOnInsert: {
+            userId,
+            courseId,
+            amount: Number(session.amount_total ?? 0) / 100,
+            status: "paid",
+            stripeSessionId: session.id,
+            createdAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
 
       console.log("✅ Course unlocked & transaction saved");
-
     } catch (err: unknown) {
-      console.error("DB ERROR:", err instanceof Error ? err.message : err);
+      console.error(
+        "Stripe Webhook: Database operation failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+      return NextResponse.json({ error: "Database operation failed" }, { status: 500 });
     }
   }
 

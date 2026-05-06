@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import connectDB from "@/lib/db";
 import Subscription from "@/models/Subscription";
-import User from "@/models/User";
-import Course from "@/models/Course";
 
 export async function GET(request: Request) {
   const { response } = await requireAdmin();
@@ -29,8 +27,15 @@ export async function GET(request: Request) {
     .sort({ createdAt: -1 })
     .lean();
 
-  const transactions = await Subscription.find({});
-  const totalRevenue = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const transactions = await Subscription.find({ status: "paid" })
+    .populate("userId", "name email")
+    .populate("courseId", "title isPremium price")
+    .sort({ createdAt: -1 })
+    .lean();
+  const totalRevenue = transactions.reduce(
+    (sum, transaction) => sum + Number(transaction.amount ?? 0),
+    0
+  );
   const totalSales = transactions.length;
 
   const paidSubscriptions = subscriptions.filter((s) => s.status === "paid");
