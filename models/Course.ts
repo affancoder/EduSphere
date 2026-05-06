@@ -71,6 +71,7 @@ const CourseSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please provide a category"],
       enum: [
+        "FullStack",
         "frontend",
         "backend",
         "security",
@@ -106,6 +107,11 @@ const CourseSchema = new mongoose.Schema(
     isPremium: {
       type: Boolean,
       default: false,
+    },
+    accessCategory: {
+      type: String,
+      enum: ["free", "premium"],
+      default: "free",
     },
     price: {
       type: Number,

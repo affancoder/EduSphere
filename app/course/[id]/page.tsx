@@ -36,6 +36,32 @@ interface Course {
   }>;
 }
 
+type RazorpayHandlerResponse = {
+  razorpay_payment_id: string;
+  razorpay_order_id?: string;
+  razorpay_signature: string;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill?: { name?: string; email?: string };
+  modal?: { ondismiss?: () => void };
+  handler?: (
+    response: RazorpayHandlerResponse
+  ) => void | Promise<void>;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => { open: () => void };
+  }
+}
+
 export default function CoursePage() {
   const router = useRouter();
   const params = useParams();
@@ -44,17 +70,26 @@ export default function CoursePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  const [access, setAccess] = useState<{
+    allowed: boolean;
+    category: "free" | "premium";
+    price: number;
+  } | null>(null);
+  const [unlockLoading, setUnlockLoading] = useState(false);
+  const [unlockError, setUnlockError] = useState<string>("");
 
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
-        const [courseRes, progressRes] = await Promise.all([
+        const [courseRes, progressRes, accessRes] = await Promise.all([
           fetch(`/api/courses/${params.id}`),
-          fetch(`/api/progress/course/${params.id}`)
+          fetch(`/api/progress/course/${params.id}`),
+          fetch(`/api/course/access/${params.id}`),
         ]);
 
         const courseData = await courseRes.json();
         const progressData = await progressRes.json();
+        const accessData = await accessRes.json();
 
         if (courseData.success) {
           console.log("Course modules:", courseData.course?.modules);
@@ -62,6 +97,10 @@ export default function CoursePage() {
           setLessons(courseData.lessons);
         } else {
           setError(courseData.error || "Failed to load course");
+        }
+
+        if (accessData) {
+          setAccess(accessData);
         }
 
         if (progressRes.ok && progressData.progress) {
@@ -79,6 +118,103 @@ export default function CoursePage() {
 
   const handleLessonClick = (lessonId: string) => {
     router.push(`/course/${params.id}/lesson/${lessonId}`);
+  };
+
+  const ensureRazorpayScriptLoaded = async () => {
+    const existing = document.getElementById("razorpay-checkout-js");
+    if (existing) return;
+
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.id = "razorpay-checkout-js";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () =>
+        reject(new Error("Failed to load Razorpay script"));
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleUnlockPremium = async () => {
+    if (!course) return;
+    setUnlockError("");
+    setUnlockLoading(true);
+    try {
+      console.log("create-order clicked for course:", params.id);
+      const createRes = await fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId: params.id }),
+      });
+      const createData = await createRes.json();
+      console.log("create-order response:", createData);
+
+      if (!createRes.ok) {
+        throw new Error(createData.error || "Failed to create order");
+      }
+
+      await ensureRazorpayScriptLoaded();
+
+      const orderId = createData.orderId as string;
+      const amount = createData.amount as number;
+      const currency = createData.currency as string;
+      const keyId = createData.keyId as string;
+
+      const options: RazorpayOptions = {
+        key: keyId,
+        amount,
+        currency,
+        name: "EduSphere",
+        description: `Unlock premium: ${course.title}`,
+        order_id: orderId,
+        prefill: {
+          name: "Student",
+          email: "",
+        },
+        modal: {
+          ondismiss: () => setUnlockLoading(false),
+        },
+        handler: async (response: RazorpayHandlerResponse) => {
+          console.log("payment handler response:", response);
+          try {
+            const verifyRes = await fetch("/api/payment/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                courseId: params.id,
+                razorpay_order_id:
+                  response.razorpay_order_id ?? orderId,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const verifyData = await verifyRes.json();
+            console.log("verify-payment response:", verifyData);
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.error || "Verification failed");
+            }
+
+            const accessRes2 = await fetch(`/api/course/access/${params.id}`);
+            const accessData2 = await accessRes2.json();
+            setAccess(accessData2);
+          } catch (e: unknown) {
+            setUnlockError(
+              e instanceof Error ? e.message : "Verification failed"
+            );
+          } finally {
+            setUnlockLoading(false);
+          }
+        },
+      };
+
+      if (!window.Razorpay) throw new Error("Razorpay is not loaded");
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (e: unknown) {
+      setUnlockError(e instanceof Error ? e.message : "Unlock failed");
+      setUnlockLoading(false);
+    }
   };
 
   if (loading) {
@@ -133,6 +269,50 @@ export default function CoursePage() {
     );
   }
 
+  if (access?.category === "premium" && !access.allowed) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Navbar />
+        <main className="flex-1 container mx-auto px-6 pt-32 pb-20">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="font-display text-4xl md:text-5xl text-text-primary mb-2">
+              {course.title}
+            </h1>
+            <p className="text-text-muted text-lg mb-8">{course.description}</p>
+
+            <div className="rounded-xl border border-border-gold bg-surface p-6">
+              <h2 className="font-display text-2xl text-text-primary mb-2">
+                Premium Course Locked
+              </h2>
+              <p className="text-text-muted mb-4">
+                Complete payment to unlock this course.
+              </p>
+
+              <div className="text-text-primary font-semibold mb-4">
+                Price: Rs. {access.price?.toLocaleString()}
+              </div>
+
+              {unlockError && (
+                <div className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                  {unlockError}
+                </div>
+              )}
+
+              <button
+                onClick={handleUnlockPremium}
+                disabled={unlockLoading}
+                className="rounded bg-[#d4af37] px-6 py-3 text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {unlockLoading ? "Opening Razorpay..." : "Unlock Premium"}
+              </button>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -168,7 +348,27 @@ export default function CoursePage() {
             </div>
           </motion.div>
 
-          <div className="space-y-4">
+          {access?.category === "free" && (
+            <div className="rounded-xl border border-border-gold bg-surface p-4 mb-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Free Course</p>
+                  <p className="text-xs text-text-muted">Start learning anytime.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const el = document.getElementById("course-content-anchor");
+                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="rounded bg-[#d4af37] px-4 py-2 text-xs font-bold text-black"
+                >
+                  Start Free
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div id="course-content-anchor" className="space-y-4">
             {lessons.map((lesson, index) => (
               <motion.div
                 key={lesson._id}

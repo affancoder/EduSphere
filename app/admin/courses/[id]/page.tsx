@@ -158,13 +158,13 @@ export default function AdminCourseContentPage() {
 
   return (
     <section className="space-y-6">
-      <button
+      {/* <button
         onClick={() => console.log("CLICKED TEST BUTTON (rendered state)")}
         className="rounded bg-white px-3 py-2 text-sm text-black"
         style={{ position: "relative", zIndex: 9999, pointerEvents: "auto" }}
       >
         Click Test
-      </button>
+      </button> */}
       <h1 className="text-3xl font-display">{course.title}</h1>
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">

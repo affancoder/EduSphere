@@ -415,7 +415,7 @@ export default function DashboardPage() {
 
           {/* Standard Resources */}
           <div className="mb-12">
-            <h2 className="font-display text-3xl text-text-primary mb-6">Standard <span className="text-gold italic">Resources</span></h2>
+            <h2 className="font-display text-3xl text-text-primary mb-6 text-center">Standard <span className="text-gold italic">Resources</span></h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course) => (
                 <motion.div
