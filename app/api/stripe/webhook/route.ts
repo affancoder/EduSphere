@@ -49,13 +49,18 @@ export async function POST(req: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
     const courseId = session.metadata?.courseId;
+    const amount = session.amount_total;
+    const stripeSessionId = session.id;
 
     console.log("USER:", userId);
     console.log("COURSE:", courseId);
 
-    if (!userId || !courseId) {
-      console.warn("Stripe Webhook: Missing userId or courseId in session metadata");
-      return NextResponse.json({ received: true });
+    if (!userId || !courseId || amount == null || !stripeSessionId) {
+      console.error("Missing transaction data");
+      return NextResponse.json(
+        { error: "Missing transaction data" },
+        { status: 400 }
+      );
     }
 
     try {
@@ -65,22 +70,48 @@ export async function POST(req: Request) {
         $addToSet: { purchasedCourses: courseId },
       });
 
-      await Subscription.updateOne(
-        { stripeSessionId: session.id },
-        {
-          $setOnInsert: {
-            userId,
-            courseId,
-            amount: Number(session.amount_total ?? 0) / 100,
-            status: "paid",
-            stripeSessionId: session.id,
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true }
+      const updatedUser = await User.findById(userId).select("purchasedCourses");
+      const hasPurchasedCourse = updatedUser?.purchasedCourses?.some(
+        (id: string | unknown) => String(id) === String(courseId)
       );
 
-      console.log("✅ Course unlocked & transaction saved");
+      if (!updatedUser || !hasPurchasedCourse) {
+        console.error("Stripe Webhook: Failed to verify course purchase on user");
+        return NextResponse.json(
+          { error: "Failed to verify purchase" },
+          { status: 500 }
+        );
+      }
+
+      const existingTransaction = await Subscription.findOne({ stripeSessionId })
+        .select("_id")
+        .lean();
+
+      if (!existingTransaction) {
+        await Subscription.create({
+          userId,
+          courseId,
+          amount: amount / 100,
+          status: "paid",
+          stripeSessionId,
+          createdAt: new Date(),
+        });
+      }
+
+      const savedTransaction = await Subscription.findOne({ stripeSessionId })
+        .select("_id userId courseId amount status stripeSessionId createdAt")
+        .lean();
+
+      if (!savedTransaction) {
+        console.error("Stripe Webhook: Failed to verify saved transaction");
+        return NextResponse.json(
+          { error: "Failed to verify transaction" },
+          { status: 500 }
+        );
+      }
+
+      console.log("Transaction saved successfully");
+      console.log("Course successfully added to user");
     } catch (err: unknown) {
       console.error(
         "Stripe Webhook: Database operation failed:",
