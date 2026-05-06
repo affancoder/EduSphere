@@ -10,7 +10,7 @@ if (!stripeSecretKey) {
 }
 
 const stripe = new Stripe(stripeSecretKey || "", {
-  apiVersion: "2025-02-24.acacia" as any,
+  apiVersion: "2026-04-22.dahlia",
 });
 
 export async function POST(req: Request) {
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
     console.log(`Stripe Webhook: Received event type: ${event.type}`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(`Stripe Webhook: Signature verification failed: ${err.message}`);
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         }
 
         console.log(`✅ Stripe Webhook: Course ${courseId} successfully unlocked for user ${userId}`);
-      } catch (dbErr: any) {
+      } catch (dbErr: unknown) {
         console.error("Stripe Webhook: Database update failed:", dbErr.message);
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });
       }
