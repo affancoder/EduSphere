@@ -60,7 +60,7 @@ export async function GET(
     }
 
     const hasAccess = user.purchasedCourses.some(
-      (id) => String(id) === String(course._id)
+      (id: string | any) => String(id) === String(course._id)
     );
 
     return NextResponse.json({

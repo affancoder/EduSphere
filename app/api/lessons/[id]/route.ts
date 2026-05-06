@@ -5,11 +5,12 @@ import Course from "@/models/Course";
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await connectDB();
-    const lesson = await Lesson.findById(params.id);
+    const lesson = await Lesson.findById(id);
     
     if (!lesson) {
       return NextResponse.json({ success: false, error: "Lesson not found" }, { status: 404 });
@@ -19,7 +20,7 @@ export async function GET(
     
     // Find all lessons for this course to determine next/prev
     const allLessons = await Lesson.find({ courseId: lesson.courseId }).sort({ order: 1 });
-    const currentIndex = allLessons.findIndex(l => l._id.toString() === params.id);
+    const currentIndex = allLessons.findIndex(l => l._id.toString() === id);
     
     const prevLessonId = currentIndex > 0 ? allLessons[currentIndex - 1]._id : null;
     const nextLessonId = currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1]._id : null;

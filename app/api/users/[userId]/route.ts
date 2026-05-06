@@ -4,11 +4,12 @@ import User from "@/models/User";
 
 export async function GET(
   req: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await params;
     await connectDB();
-    const user = await User.findById(params.userId).select("-password");
+    const user = await User.findById(userId).select("-password");
     
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });

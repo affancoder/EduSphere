@@ -16,7 +16,7 @@ if (cloudName && apiKey && apiSecret) {
     cloudinary_url: process.env.CLOUDINARY_URL,
     secure: true,
   });
-} else if (process.env.NODE_ENV === "production") {
+} else if (process.env.NODE_ENV === "production" && !process.env.NEXT_PHASE) {
   throw new Error(
     "Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET."
   );

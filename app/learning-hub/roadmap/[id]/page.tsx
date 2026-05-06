@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ChevronLeft, 
@@ -48,7 +48,8 @@ interface LessonContent {
   quiz: QuizItem[];
 }
 
-export default function RoadmapViewer({ params }: { params: { id: string } }) {
+export default function RoadmapViewer({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [currentTopicIdx, setCurrentTopicIdx] = useState(0);
   const [lessonContent, setLessonContent] = useState<LessonContent | null>(null);
@@ -59,11 +60,11 @@ export default function RoadmapViewer({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchRoadmap();
-  }, [params.id]);
+  }, [id]);
 
   const fetchRoadmap = async () => {
     try {
-      const res = await fetch(`/api/roadmap/${params.id}`);
+      const res = await fetch(`/api/roadmap/${id}`);
       const data = await res.json();
       if (res.ok) {
         setRoadmap(data.roadmap);

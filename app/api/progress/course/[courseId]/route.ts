@@ -6,9 +6,10 @@ import Progress from "@/models/Progress";
 
 export async function GET(
   req: Request,
-  { params }: { params: { courseId: string } }
+  { params }: { params: Promise<{ courseId: string }> }
 ) {
   try {
+    const { courseId } = await params;
     const cookieStore = await cookies();
     const token = cookieStore.get("token")?.value;
 
@@ -21,7 +22,7 @@ export async function GET(
 
     const progress = await Progress.findOne({ 
       userId: decoded.id, 
-      courseId: params.courseId 
+      courseId: courseId 
     });
 
     return NextResponse.json({ progress }, { status: 200 });

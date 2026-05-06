@@ -28,14 +28,13 @@ const ProgressSchema = new mongoose.Schema(
 );
 
 // Auto-calculate percentage before saving
-ProgressSchema.pre("save", function (next) {
+ProgressSchema.pre("save", function () {
   if (this.totalLessons && this.totalLessons > 0) {
     const calc = (this.completedLessons.length / this.totalLessons) * 100;
     this.percentage = Math.min(100, Math.max(0, Math.round(calc)));
   } else {
     this.percentage = 0;
   }
-  next();
 });
 
 export default mongoose.models.Progress || mongoose.model("Progress", ProgressSchema);

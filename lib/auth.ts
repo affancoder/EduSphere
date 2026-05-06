@@ -3,11 +3,12 @@ import bcrypt from "bcryptjs";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!JWT_SECRET && process.env.NODE_ENV === "production") {
+// Only throw if missing in actual production runtime, not during build
+if (!JWT_SECRET && process.env.NODE_ENV === "production" && !process.env.NEXT_PHASE) {
   throw new Error("JWT_SECRET is not defined in environment variables");
 }
 
-const SECRET = JWT_SECRET || "fallback_secret_for_development_only";
+const SECRET = JWT_SECRET || "fallback_secret_for_build_or_dev";
 
 export interface TokenPayload {
   id: string;
