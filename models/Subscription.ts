@@ -25,6 +25,11 @@ const SubscriptionSchema = new Schema(
       default: "pending",
       index: true,
     },
+    stripeSessionId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
   },
   { timestamps: true }
 );

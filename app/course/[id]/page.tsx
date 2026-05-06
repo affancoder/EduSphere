@@ -43,6 +43,7 @@ export default function CoursePage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [access, setAccess] = useState<{
     allowed: boolean;
@@ -55,18 +56,19 @@ export default function CoursePage() {
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
-        const [courseRes, progressRes, accessRes] = await Promise.all([
+        const [courseRes, progressRes, accessRes, userRes] = await Promise.all([
           fetch(`/api/courses/${params.id}`),
           fetch(`/api/progress/course/${params.id}`),
           fetch(`/api/course/access/${params.id}`),
+          fetch("/api/auth/me"),
         ]);
 
         const courseData = await courseRes.json();
         const progressData = await progressRes.json();
         const accessData = await accessRes.json();
+        const userData = await userRes.json();
 
         if (courseData.success) {
-          console.log("Course modules:", courseData.course?.modules);
           setCourse(courseData.course);
           setLessons(courseData.lessons);
         } else {
@@ -75,6 +77,10 @@ export default function CoursePage() {
 
         if (accessData) {
           setAccess(accessData);
+        }
+
+        if (userRes.ok) {
+          setUser(userData.user);
         }
 
         if (progressRes.ok && progressData.progress) {
@@ -176,47 +182,52 @@ export default function CoursePage() {
   }
 
   if (access?.category === "premium" && !access.allowed) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Navbar />
-        <main className="flex-1 container mx-auto px-6 pt-32 pb-20">
-          <div className="max-w-2xl mx-auto">
-            <h1 className="font-display text-4xl md:text-5xl text-text-primary mb-2">
-              {course.title}
-            </h1>
-            <p className="text-text-muted text-lg mb-8">{course.description}</p>
+    // Double check with user data if available
+    const isPurchased = user?.purchasedCourses?.includes(params.id);
+    
+    if (!isPurchased) {
+      return (
+        <div className="min-h-screen flex flex-col bg-background">
+          <Navbar />
+          <main className="flex-1 container mx-auto px-6 pt-32 pb-20">
+            <div className="max-w-2xl mx-auto">
+              <h1 className="font-display text-4xl md:text-5xl text-text-primary mb-2">
+                {course.title}
+              </h1>
+              <p className="text-text-muted text-lg mb-8">{course.description}</p>
 
-            <div className="rounded-xl border border-border-gold bg-surface p-6">
-              <h2 className="font-display text-2xl text-text-primary mb-2">
-                Premium Course Locked
-              </h2>
-              <p className="text-text-muted mb-4">
-                Complete payment to unlock this course.
-              </p>
+              <div className="rounded-xl border border-border-gold bg-surface p-6">
+                <h2 className="font-display text-2xl text-text-primary mb-2">
+                  Premium Course Locked
+                </h2>
+                <p className="text-text-muted mb-4">
+                  Complete payment to unlock this course.
+                </p>
 
-              <div className="text-text-primary font-semibold mb-4">
-                Price: Rs. {access.price?.toLocaleString()}
-              </div>
-
-              {unlockError && (
-                <div className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                  {unlockError}
+                <div className="text-text-primary font-semibold mb-4">
+                  Price: Rs. {access.price?.toLocaleString()}
                 </div>
-              )}
 
-              <button
-                onClick={handleUnlockPremium}
-                disabled={unlockLoading}
-                className="rounded bg-[#d4af37] px-6 py-3 text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {unlockLoading ? "Redirecting to Stripe..." : "Unlock Premium"}
-              </button>
+                {unlockError && (
+                  <div className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                    {unlockError}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleUnlockPremium}
+                  disabled={unlockLoading}
+                  className="rounded bg-[#d4af37] px-6 py-3 text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {unlockLoading ? "Redirecting to Stripe..." : "Unlock Premium"}
+                </button>
+              </div>
             </div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
+          </main>
+          <Footer />
+        </div>
+      );
+    }
   }
 
   return (
