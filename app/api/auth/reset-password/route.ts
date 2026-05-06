@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -15,15 +15,22 @@ export async function POST(req: Request) {
       );
     }
 
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: "Password must be at least 6 characters" },
+        { status: 400 }
+      );
+    }
+
     await connectDB();
 
-    // 1. Hash incoming token (VERY IMPORTANT FIX)
+    // 1. Hash incoming token to compare with DB
     const hashedToken = crypto
       .createHash("sha256")
       .update(token)
       .digest("hex");
 
-    // 2. Find valid user
+    // 2. Find user with valid token and not expired
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: Date.now() },
@@ -36,9 +43,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Update password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    user.password = hashedPassword;
+    // 3. Update password using shared hash utility
+    user.password = await hashPassword(password);
 
     // 4. Clear reset fields
     user.resetPasswordToken = undefined;
