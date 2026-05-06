@@ -36,43 +36,6 @@ interface Course {
   }>;
 }
 
-type RazorpayHandlerResponse = {
-  razorpay_payment_id: string;
-  razorpay_order_id?: string;
-  razorpay_signature: string;
-};
-
-type RazorpayOptions = {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  prefill?: { 
-    name?: string; 
-    email?: string;
-    contact?: string;
-  };
-  theme?: {
-    color?: string;
-  };
-  modal?: { 
-    ondismiss?: () => void;
-    escape?: boolean;
-    backdropclose?: boolean;
-  };
-  handler?: (
-    response: RazorpayHandlerResponse
-  ) => void | Promise<void>;
-};
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: RazorpayOptions) => { open: () => void };
-  }
-}
-
 export default function CoursePage() {
   const router = useRouter();
   const params = useParams();
@@ -131,125 +94,28 @@ export default function CoursePage() {
     router.push(`/course/${params.id}/lesson/${lessonId}`);
   };
 
-  const ensureRazorpayScriptLoaded = async () => {
-    if (typeof window !== "undefined" && window.Razorpay) return;
-
-    const existing = document.getElementById("razorpay-checkout-js");
-    if (existing) {
-      // If script exists but window.Razorpay is not ready, wait a bit
-      let attempts = 0;
-      while (attempts < 20 && !window.Razorpay) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-      if (window.Razorpay) return;
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.id = "razorpay-checkout-js";
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      script.onload = () => {
-        console.log("Razorpay script loaded successfully");
-        resolve();
-      };
-      script.onerror = () =>
-        reject(new Error("Failed to load Razorpay script. Check your internet connection."));
-      document.body.appendChild(script);
-    });
-  };
-
   const handleUnlockPremium = async () => {
     if (!course) return;
     setUnlockError("");
     setUnlockLoading(true);
     try {
-      console.log("Initiating order for course:", params.id);
-      const createRes = await fetch("/api/payment/create-order", {
+      console.log("Initiating Stripe checkout for course:", params.id);
+      const res = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courseId: params.id }),
       });
-      const createData = await createRes.json();
-      console.log("Order created:", createData);
-
-      if (!createRes.ok) {
-        throw new Error(createData.error || "Failed to create order");
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create checkout session");
       }
 
-      await ensureRazorpayScriptLoaded();
-
-      const { orderId, amount, currency, keyId } = createData;
-
-      if (!keyId) {
-        throw new Error("Razorpay Key ID is missing. Check backend environment variables.");
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("Invalid session URL received");
       }
-
-      const options: RazorpayOptions = {
-        key: keyId,
-        amount: Math.round(amount),
-        currency: currency,
-        name: "EduSphere",
-        description: `Unlock premium: ${course.title}`,
-        order_id: orderId,
-        prefill: {
-          name: "Test User",
-          email: "test@example.com",
-          contact: "9999999999",
-        },
-        theme: {
-          color: "#d4af37",
-        },
-        modal: {
-          ondismiss: () => {
-            console.log("Checkout modal closed");
-            setUnlockLoading(false);
-          },
-          escape: true,
-          backdropclose: false,
-        },
-        handler: async (response: RazorpayHandlerResponse) => {
-          console.log("Payment successful, verifying:", response);
-          try {
-            const verifyRes = await fetch("/api/payment/verify-payment", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                courseId: params.id,
-                razorpay_order_id: response.razorpay_order_id || orderId,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            });
-            const verifyData = await verifyRes.json();
-            console.log("Verification result:", verifyData);
-            
-            if (!verifyRes.ok) {
-              throw new Error(verifyData.error || "Verification failed");
-            }
-
-            // Refresh access state
-            const accessRes2 = await fetch(`/api/course/access/${params.id}`);
-            const accessData2 = await accessRes2.json();
-            setAccess(accessData2);
-            router.refresh();
-          } catch (e: unknown) {
-            console.error("Verification error:", e);
-            setUnlockError(e instanceof Error ? e.message : "Verification failed");
-          } finally {
-            setUnlockLoading(false);
-          }
-        },
-      };
-
-      if (!window.Razorpay) {
-        throw new Error("Razorpay SDK not found even after loading script");
-      }
-
-      console.log("Opening Razorpay modal...");
-      const rzp = new window.Razorpay(options);
-      rzp.open();
     } catch (e: unknown) {
       console.error("Unlock flow error:", e);
       setUnlockError(e instanceof Error ? e.message : "Unlock failed");
@@ -343,7 +209,7 @@ export default function CoursePage() {
                 disabled={unlockLoading}
                 className="rounded bg-[#d4af37] px-6 py-3 text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {unlockLoading ? "Opening Razorpay..." : "Unlock Premium"}
+                {unlockLoading ? "Redirecting to Stripe..." : "Unlock Premium"}
               </button>
             </div>
           </div>

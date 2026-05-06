@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded: any = verifyToken(token);
+    const decoded: unknown = verifyToken(token);
     if (!decoded) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     }
 
     const newDoubt = await Doubt.create({
-      userId: decoded.id,
+      userId: (decoded as { id: string }).id,
       question: question.trim(),
       answer: answer,
       topic: topic,
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, doubt: newDoubt }, { status: 201 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("AI Ask Error:", error);
     return NextResponse.json(
       { error: "Failed to get AI answer. Please try again." },
