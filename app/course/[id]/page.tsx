@@ -49,8 +49,19 @@ type RazorpayOptions = {
   name: string;
   description: string;
   order_id: string;
-  prefill?: { name?: string; email?: string };
-  modal?: { ondismiss?: () => void };
+  prefill?: { 
+    name?: string; 
+    email?: string;
+    contact?: string;
+  };
+  theme?: {
+    color?: string;
+  };
+  modal?: { 
+    ondismiss?: () => void;
+    escape?: boolean;
+    backdropclose?: boolean;
+  };
   handler?: (
     response: RazorpayHandlerResponse
   ) => void | Promise<void>;
@@ -121,17 +132,30 @@ export default function CoursePage() {
   };
 
   const ensureRazorpayScriptLoaded = async () => {
-    const existing = document.getElementById("razorpay-checkout-js");
-    if (existing) return;
+    if (typeof window !== "undefined" && window.Razorpay) return;
 
-    await new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById("razorpay-checkout-js");
+    if (existing) {
+      // If script exists but window.Razorpay is not ready, wait a bit
+      let attempts = 0;
+      while (attempts < 20 && !window.Razorpay) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      if (window.Razorpay) return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
       const script = document.createElement("script");
       script.id = "razorpay-checkout-js";
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.async = true;
-      script.onload = () => resolve();
+      script.onload = () => {
+        console.log("Razorpay script loaded successfully");
+        resolve();
+      };
       script.onerror = () =>
-        reject(new Error("Failed to load Razorpay script"));
+        reject(new Error("Failed to load Razorpay script. Check your internet connection."));
       document.body.appendChild(script);
     });
   };
@@ -141,14 +165,14 @@ export default function CoursePage() {
     setUnlockError("");
     setUnlockLoading(true);
     try {
-      console.log("create-order clicked for course:", params.id);
+      console.log("Initiating order for course:", params.id);
       const createRes = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courseId: params.id }),
       });
       const createData = await createRes.json();
-      console.log("create-order response:", createData);
+      console.log("Order created:", createData);
 
       if (!createRes.ok) {
         throw new Error(createData.error || "Failed to create order");
@@ -156,62 +180,78 @@ export default function CoursePage() {
 
       await ensureRazorpayScriptLoaded();
 
-      const orderId = createData.orderId as string;
-      const amount = createData.amount as number;
-      const currency = createData.currency as string;
-      const keyId = createData.keyId as string;
+      const { orderId, amount, currency, keyId } = createData;
+
+      if (!keyId) {
+        throw new Error("Razorpay Key ID is missing. Check backend environment variables.");
+      }
 
       const options: RazorpayOptions = {
         key: keyId,
-        amount,
-        currency,
+        amount: Math.round(amount),
+        currency: currency,
         name: "EduSphere",
         description: `Unlock premium: ${course.title}`,
         order_id: orderId,
         prefill: {
-          name: "Student",
-          email: "",
+          name: "Test User",
+          email: "test@example.com",
+          contact: "9999999999",
+        },
+        theme: {
+          color: "#d4af37",
         },
         modal: {
-          ondismiss: () => setUnlockLoading(false),
+          ondismiss: () => {
+            console.log("Checkout modal closed");
+            setUnlockLoading(false);
+          },
+          escape: true,
+          backdropclose: false,
         },
         handler: async (response: RazorpayHandlerResponse) => {
-          console.log("payment handler response:", response);
+          console.log("Payment successful, verifying:", response);
           try {
             const verifyRes = await fetch("/api/payment/verify-payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 courseId: params.id,
-                razorpay_order_id:
-                  response.razorpay_order_id ?? orderId,
+                razorpay_order_id: response.razorpay_order_id || orderId,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               }),
             });
             const verifyData = await verifyRes.json();
-            console.log("verify-payment response:", verifyData);
+            console.log("Verification result:", verifyData);
+            
             if (!verifyRes.ok) {
               throw new Error(verifyData.error || "Verification failed");
             }
 
+            // Refresh access state
             const accessRes2 = await fetch(`/api/course/access/${params.id}`);
             const accessData2 = await accessRes2.json();
             setAccess(accessData2);
+            router.refresh();
           } catch (e: unknown) {
-            setUnlockError(
-              e instanceof Error ? e.message : "Verification failed"
-            );
+            console.error("Verification error:", e);
+            setUnlockError(e instanceof Error ? e.message : "Verification failed");
           } finally {
             setUnlockLoading(false);
           }
         },
       };
 
-      if (!window.Razorpay) throw new Error("Razorpay is not loaded");
+      if (!window.Razorpay) {
+        throw new Error("Razorpay SDK not found even after loading script");
+      }
+
+      console.log("Opening Razorpay modal...");
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (e: unknown) {
+      console.error("Unlock flow error:", e);
       setUnlockError(e instanceof Error ? e.message : "Unlock failed");
       setUnlockLoading(false);
     }

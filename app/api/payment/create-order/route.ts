@@ -65,17 +65,25 @@ export async function POST(request: Request) {
 
     const amountPaise = Math.round(rupees * 100);
 
+    if (amountPaise < 100) {
+      return NextResponse.json(
+        { error: "Minimum amount for Razorpay is Rs. 1 (100 paise)" },
+        { status: 400 }
+      );
+    }
+
     // Receipt helps trace orders; Razorpay requires a string.
-    const receipt = crypto
-      .randomBytes(10)
-      .toString("hex")
-      .slice(0, 20);
+    const receipt = `rcpt_${crypto.randomBytes(4).toString("hex")}`;
 
     const order = await razorpay.orders.create({
       amount: amountPaise,
       currency,
       receipt,
     });
+
+    if (!order) {
+      throw new Error("Razorpay order creation failed");
+    }
 
     await RazorpayOrder.create({
       userId: decoded.id,
@@ -86,11 +94,20 @@ export async function POST(request: Request) {
       lastSignature: "",
     });
 
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    if (!keyId) {
+      console.error("RAZORPAY_KEY_ID is missing in environment variables");
+      return NextResponse.json(
+        { error: "Payment gateway configuration error" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       orderId: order.id,
       amount: order.amount,
       currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      keyId: keyId,
     });
   } catch (error) {
     console.error("create-order error:", error);
