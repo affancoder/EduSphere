@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import crypto from "crypto";
-import { hashPassword } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
   try {
@@ -10,27 +10,20 @@ export async function POST(req: Request) {
 
     if (!token || !password) {
       return NextResponse.json(
-        { error: "Token and new password are required" },
-        { status: 400 }
-      );
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: "Token and password are required" },
         { status: 400 }
       );
     }
 
     await connectDB();
 
-    // 1. Hash the incoming token to compare with DB
+    // 1. Hash incoming token (VERY IMPORTANT FIX)
     const hashedToken = crypto
       .createHash("sha256")
       .update(token)
       .digest("hex");
 
-    // 2. Find user with valid token and not expired
+    // 2. Find valid user
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: Date.now() },
@@ -44,18 +37,24 @@ export async function POST(req: Request) {
     }
 
     // 3. Update password
-    user.password = await hashPassword(password);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = hashedPassword;
+
+    // 4. Clear reset fields
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
 
     await user.save();
 
-    return NextResponse.json(
-      { message: "Password has been reset successfully" },
-      { status: 200 }
-    );
-  } catch (error: any) {
+    return NextResponse.json({
+      message: "Password reset successful",
+    });
+  } catch (error) {
     console.error("Reset password error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
