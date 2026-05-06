@@ -35,8 +35,8 @@ export async function POST(req: Request) {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
     console.log(`Stripe Webhook: Received event type: ${event.type}`);
   } catch (err: unknown) {
-    console.error(`Stripe Webhook: Signature verification failed: ${err.message}`);
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+    console.error(`Stripe Webhook: Signature verification failed: ${err instanceof Error ? err.message : String(err)}`);
+    return NextResponse.json({ error: `Webhook Error: ${err instanceof Error ? err.message : String(err)}` }, { status: 400 });
   }
 
   // Handle the event
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
         console.log(`✅ Stripe Webhook: Course ${courseId} successfully unlocked for user ${userId}`);
       } catch (dbErr: unknown) {
-        console.error("Stripe Webhook: Database update failed:", dbErr.message);
+        console.error("Stripe Webhook: Database update failed:", dbErr instanceof Error ? dbErr.message : dbErr);
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });
       }
     } else {

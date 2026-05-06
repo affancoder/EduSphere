@@ -11,7 +11,7 @@ if (!stripeSecretKey) {
 }
 
 const stripe = new Stripe(stripeSecretKey || "", {
-  apiVersion: "2025-02-24.acacia" as any,
+  apiVersion: "2026-04-22.dahlia",
 });
 
 export async function POST(request: Request) {
@@ -88,12 +88,12 @@ export async function POST(request: Request) {
 
     console.log(`Stripe Checkout: Session created successfully. URL: ${session.url}`);
     return NextResponse.json({ url: session.url });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Stripe Checkout Error:", error);
     return NextResponse.json(
       { 
         error: "Failed to create checkout session", 
-        details: error.message || "Unknown error" 
+        details: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }
     );
