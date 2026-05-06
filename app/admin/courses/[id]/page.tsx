@@ -52,21 +52,37 @@ export default function AdminCourseContentPage() {
   };
 
   const uploadFile = async (file: File) => {
-    console.log("uploadFile file:", file);
+    console.log("Starting upload for file:", file.name);
     const form = new FormData();
     form.append("file", file);
-    const uploadRes = await fetch("/api/admin/upload", {
-      method: "POST",
-      body: form,
-    });
-    if (!uploadRes.ok) {
-      const error = await uploadRes.json();
-      console.log("uploadFile error response:", error);
-      throw new Error(error.error || "Upload failed");
+    
+    try {
+      const uploadRes = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: form,
+        // Important: Do NOT set Content-Type header manually for FormData
+      });
+
+      const contentType = uploadRes.headers.get("content-type");
+      
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await uploadRes.text();
+        console.error("Non-JSON response received from server:", text);
+        throw new Error("Server returned an invalid response format (HTML instead of JSON). Check if you are logged in as admin.");
+      }
+
+      const uploadData = await uploadRes.json();
+      console.log("Upload response data:", uploadData);
+
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Upload failed");
+      }
+
+      return uploadData.url as string;
+    } catch (err) {
+      console.error("uploadFile caught error:", err);
+      throw err;
     }
-    const uploadData = await uploadRes.json();
-    console.log("uploadFile response:", uploadData);
-    return uploadData.url as string;
   };
 
   const onVideoUpload = async (moduleId: string, file: File) => {
