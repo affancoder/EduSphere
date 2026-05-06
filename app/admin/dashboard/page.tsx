@@ -7,6 +7,8 @@ type Stats = {
   courses: number;
   subscriptions: number;
   revenue: number;
+  purchasedUsers: number;
+  coursesSold: number;
 };
 
 export default function AdminDashboardPage() {
@@ -15,6 +17,8 @@ export default function AdminDashboardPage() {
     courses: 0,
     subscriptions: 0,
     revenue: 0,
+    purchasedUsers: 0,
+    coursesSold: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -36,8 +40,10 @@ export default function AdminDashboardPage() {
         setStats({
           users: usersData.users?.length ?? 0,
           courses: coursesData.courses?.length ?? 0,
-          subscriptions: subscriptionsData.overview?.totalSubscriptions ?? 0,
+          subscriptions: subscriptionsData.overview?.paidSubscriptions ?? 0,
           revenue: subscriptionsData.overview?.revenue ?? 0,
+          purchasedUsers: subscriptionsData.overview?.uniqueUsers ?? 0,
+          coursesSold: subscriptionsData.overview?.uniqueCourses ?? 0,
         });
       } finally {
         setLoading(false);
@@ -48,10 +54,12 @@ export default function AdminDashboardPage() {
   }, []);
 
   const cards = [
+    { label: "Total Revenue", value: `Rs. ${stats.revenue.toLocaleString()}` },
+    { label: "Total Purchases", value: stats.subscriptions },
+    { label: "Purchased Users", value: stats.purchasedUsers },
+    { label: "Courses Sold", value: stats.coursesSold },
     { label: "Total Users", value: stats.users },
     { label: "Total Courses", value: stats.courses },
-    { label: "Total Subscriptions", value: stats.subscriptions },
-    { label: "Total Revenue", value: `Rs. ${stats.revenue.toLocaleString()}` },
   ];
 
   return (

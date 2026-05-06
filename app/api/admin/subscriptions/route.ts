@@ -30,12 +30,18 @@ export async function GET(request: Request) {
     0
   );
 
+  // Calculate unique users and unique courses sold
+  const uniqueUsers = new Set(paidSubscriptions.map((s) => s.userId?._id?.toString())).size;
+  const uniqueCourses = new Set(paidSubscriptions.map((s) => s.courseId?._id?.toString())).size;
+
   return NextResponse.json({
     subscriptions,
     overview: {
       totalSubscriptions: subscriptions.length,
       paidSubscriptions: paidSubscriptions.length,
       revenue,
+      uniqueUsers,
+      uniqueCourses,
     },
   });
 }

@@ -15,6 +15,8 @@ type Overview = {
   totalSubscriptions: number;
   paidSubscriptions: number;
   revenue: number;
+  uniqueUsers: number;
+  uniqueCourses: number;
 };
 
 export default function AdminSubscriptionsPage() {
@@ -23,6 +25,8 @@ export default function AdminSubscriptionsPage() {
     totalSubscriptions: 0,
     paidSubscriptions: 0,
     revenue: 0,
+    uniqueUsers: 0,
+    uniqueCourses: 0,
   });
   const [filters, setFilters] = useState({ user: "", course: "", status: "" });
 
@@ -50,18 +54,26 @@ export default function AdminSubscriptionsPage() {
     <section className="space-y-6">
       <h1 className="text-3xl font-display">Subscriptions</h1>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-          <p className="text-xs uppercase text-white/60">Total</p>
-          <p className="mt-1 text-2xl">{overview.totalSubscriptions}</p>
+          <p className="text-xs uppercase text-white/60">Total Revenue</p>
+          <p className="mt-1 text-2xl">Rs. {overview.revenue.toLocaleString()}</p>
         </div>
         <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-          <p className="text-xs uppercase text-white/60">Paid</p>
+          <p className="text-xs uppercase text-white/60">Total Purchases</p>
           <p className="mt-1 text-2xl">{overview.paidSubscriptions}</p>
         </div>
         <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-          <p className="text-xs uppercase text-white/60">Revenue</p>
-          <p className="mt-1 text-2xl">Rs. {overview.revenue.toLocaleString()}</p>
+          <p className="text-xs uppercase text-white/60">Purchased Users</p>
+          <p className="mt-1 text-2xl">{overview.uniqueUsers}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <p className="text-xs uppercase text-white/60">Courses Sold</p>
+          <p className="mt-1 text-2xl">{overview.uniqueCourses}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <p className="text-xs uppercase text-white/60">Total Attempts</p>
+          <p className="mt-1 text-2xl">{overview.totalSubscriptions}</p>
         </div>
       </div>
 

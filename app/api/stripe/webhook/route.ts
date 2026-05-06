@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
+import Subscription from "@/models/Subscription";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 if (!stripeSecretKey) {
@@ -48,6 +49,17 @@ export async function POST(req: Request) {
     if (userId && courseId) {
       try {
         await connectDB();
+
+        // 1. Create or Update Subscription record
+        const amount = session.amount_total ? session.amount_total / 100 : 0;
+        await Subscription.create({
+          userId,
+          courseId,
+          amount,
+          status: "paid",
+        });
+
+        // 2. Unlock course for user
         const updatedUser = await User.findByIdAndUpdate(userId, {
           $addToSet: { purchasedCourses: courseId },
         });
@@ -57,7 +69,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        console.log(`✅ Stripe Webhook: Course ${courseId} successfully unlocked for user ${userId}`);
+        console.log(`✅ Stripe Webhook: Course ${courseId} successfully unlocked and transaction saved for user ${userId}`);
       } catch (dbErr: unknown) {
         console.error("Stripe Webhook: Database update failed:", dbErr instanceof Error ? dbErr.message : dbErr);
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });
