@@ -46,7 +46,7 @@ export async function POST(req: Request) {
 
     // 4. Create reset link (RAW token goes in URL)
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      process.env.NEXT_PUBLIC_APP_URL;
 
     const resetUrl = `${baseUrl}/reset-password/${resetToken}`;
 
