@@ -26,9 +26,9 @@ export default function AdminDashboardPage() {
     const load = async () => {
       try {
         const [usersRes, coursesRes, subscriptionsRes] = await Promise.all([
-          fetch("/api/admin/users"),
-          fetch("/api/admin/courses"),
-          fetch("/api/admin/subscriptions"),
+          fetch("/api/admin/users", { cache: "no-store" }),
+          fetch("/api/admin/courses", { cache: "no-store" }),
+          fetch("/api/admin/subscriptions", { cache: "no-store" }),
         ]);
 
         const [usersData, coursesData, subscriptionsData] = await Promise.all([

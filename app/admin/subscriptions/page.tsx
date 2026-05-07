@@ -40,7 +40,9 @@ export default function AdminSubscriptionsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch(`/api/admin/subscriptions${query ? `?${query}` : ""}`);
+      const res = await fetch(`/api/admin/subscriptions${query ? `?${query}` : ""}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
       setSubscriptions(data.subscriptions ?? []);
       setOverview(

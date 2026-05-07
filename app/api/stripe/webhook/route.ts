@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
-import Subscription from "@/models/Subscription";
+import Purchase from "@/models/Purchase";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -49,13 +49,15 @@ export async function POST(req: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
     const courseId = session.metadata?.courseId;
-    const amount = session.amount_total;
+    const paymentIntentId = session.payment_intent as string;
     const stripeSessionId = session.id;
+    const amount = session.amount_total;
 
     console.log("USER:", userId);
     console.log("COURSE:", courseId);
+    console.log("PAYMENT INTENT:", paymentIntentId);
 
-    if (!userId || !courseId || amount == null || !stripeSessionId) {
+    if (!userId || !courseId || !paymentIntentId || !stripeSessionId) {
       console.error("Missing transaction data");
       return NextResponse.json(
         { error: "Missing transaction data" },
@@ -66,8 +68,34 @@ export async function POST(req: Request) {
     try {
       await connectDB();
 
+      // Prevent duplicate purchases
+      const existingPurchase = await Purchase.findOne({
+        userId,
+        courseId,
+      });
+
+      if (existingPurchase) {
+        console.log("Duplicate purchase prevented:", { userId, courseId });
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
+      // Save purchase in MongoDB
+      await Purchase.create({
+        userId,
+        courseId,
+        stripePaymentIntentId: paymentIntentId,
+        stripeSessionId: stripeSessionId,
+        amount: amount ? amount / 100 : 0,
+        currency: session.currency || "usd",
+        status: "completed",
+        purchasedAt: new Date(),
+      });
+
+      // Unlock course for user
       await User.findByIdAndUpdate(userId, {
-        $addToSet: { purchasedCourses: courseId },
+        $addToSet: {
+          purchasedCourses: courseId,
+        },
       });
 
       const updatedUser = await User.findById(userId).select("purchasedCourses");
@@ -83,34 +111,19 @@ export async function POST(req: Request) {
         );
       }
 
-      const existingTransaction = await Subscription.findOne({ stripeSessionId })
-        .select("_id")
+      const savedPurchase = await Purchase.findOne({ stripeSessionId })
+        .select("_id userId courseId stripePaymentIntentId stripeSessionId amount status purchasedAt")
         .lean();
 
-      if (!existingTransaction) {
-        await Subscription.create({
-          userId,
-          courseId,
-          amount: amount / 100,
-          status: "paid",
-          stripeSessionId,
-          createdAt: new Date(),
-        });
-      }
-
-      const savedTransaction = await Subscription.findOne({ stripeSessionId })
-        .select("_id userId courseId amount status stripeSessionId createdAt")
-        .lean();
-
-      if (!savedTransaction) {
-        console.error("Stripe Webhook: Failed to verify saved transaction");
+      if (!savedPurchase) {
+        console.error("Stripe Webhook: Failed to verify saved purchase");
         return NextResponse.json(
-          { error: "Failed to verify transaction" },
+          { error: "Failed to verify purchase" },
           { status: 500 }
         );
       }
 
-      console.log("Transaction saved successfully");
+      console.log("Purchase saved successfully:", savedPurchase);
       console.log("Course successfully added to user");
     } catch (err: unknown) {
       console.error(

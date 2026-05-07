@@ -63,6 +63,10 @@ export async function GET(
       (id: string | unknown) => String(id) === String(course._id)
     );
 
+    if (hasAccess) {
+      console.log("User has purchased course");
+    }
+
     return NextResponse.json({
       allowed: hasAccess,
       category: "premium",
@@ -76,4 +80,3 @@ export async function GET(
     );
   }
 }
-

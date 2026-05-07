@@ -59,15 +59,18 @@ export default function CoursePage() {
   } | null>(null);
   const [unlockLoading, setUnlockLoading] = useState(false);
   const [unlockError, setUnlockError] = useState<string>("");
+  const hasPurchasedCourse = user?.purchasedCourses?.some(
+    (id) => String(id) === courseId
+  ) ?? false;
 
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
         const [courseRes, progressRes, accessRes, userRes] = await Promise.all([
-          fetch(`/api/courses/${courseId}`),
-          fetch(`/api/progress/course/${courseId}`),
-          fetch(`/api/course/access/${courseId}`),
-          fetch("/api/auth/me"),
+          fetch(`/api/courses/${courseId}`, { cache: "no-store" }),
+          fetch(`/api/progress/course/${courseId}`, { cache: "no-store" }),
+          fetch(`/api/course/access/${courseId}`, { cache: "no-store" }),
+          fetch("/api/auth/me", { cache: "no-store" }),
         ]);
 
         const courseData = await courseRes.json();
@@ -88,6 +91,14 @@ export default function CoursePage() {
 
         if (userRes.ok) {
           setUser(userData.user);
+          if (Array.isArray(userData.user?.purchasedCourses)) {
+            const purchased = userData.user.purchasedCourses.some(
+              (id: string) => String(id) === courseId
+            );
+            if (purchased) {
+              console.log("User has purchased course");
+            }
+          }
         }
 
         if (progressRes.ok && progressData.progress) {
@@ -115,6 +126,7 @@ export default function CoursePage() {
               setAccess(nextAccessData);
               if (nextUserRes.ok) {
                 setUser(nextUserData.user);
+                console.log("User has purchased course");
               }
               break;
             }
@@ -215,12 +227,8 @@ export default function CoursePage() {
     );
   }
 
-  if (access?.category === "premium" && !access.allowed) {
-    const isPurchased = user?.purchasedCourses?.some(
-      (id) => String(id) === courseId
-    );
-    
-    if (!isPurchased) {
+  if (access?.category === "premium" && !hasPurchasedCourse) {
+    if (!hasPurchasedCourse) {
       return (
         <div className="min-h-screen flex flex-col bg-background">
           <Navbar />

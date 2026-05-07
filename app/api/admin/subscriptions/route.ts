@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import connectDB from "@/lib/db";
-import Subscription from "@/models/Subscription";
+import Purchase from "@/models/Purchase";
 
 export async function GET(request: Request) {
   const { response } = await requireAdmin();
@@ -17,20 +17,20 @@ export async function GET(request: Request) {
   const query: Record<string, string> = {};
   if (user) query.userId = user;
   if (course) query.courseId = course;
-  if (status && ["pending", "paid", "failed"].includes(status)) {
+  if (status && ["pending", "completed", "failed", "refunded"].includes(status)) {
     query.status = status;
   }
 
-  const subscriptions = await Subscription.find(query)
+  const purchases = await Purchase.find(query)
     .populate("userId", "name email")
-    .populate("courseId", "title isPremium price")
-    .sort({ createdAt: -1 })
+    .populate("courseId", "title")
+    .sort({ purchasedAt: -1 })
     .lean();
 
-  const transactions = await Subscription.find({ status: "paid" })
+  const transactions = await Purchase.find({ status: "completed" })
     .populate("userId", "name email")
-    .populate("courseId", "title isPremium price")
-    .sort({ createdAt: -1 })
+    .populate("courseId", "title")
+    .sort({ purchasedAt: -1 })
     .lean();
   const totalRevenue = transactions.reduce(
     (sum, transaction) => sum + Number(transaction.amount ?? 0),
@@ -38,24 +38,26 @@ export async function GET(request: Request) {
   );
   const totalSales = transactions.length;
 
-  const paidSubscriptions = subscriptions.filter((s) => s.status === "paid");
-  const revenue = paidSubscriptions.reduce(
+  const completedPurchases = purchases.filter((s) => s.status === "completed");
+  const revenue = completedPurchases.reduce(
     (sum, item) => sum + Number(item.amount ?? 0),
     0
   );
 
   // Calculate unique users and unique courses sold
-  const uniqueUsers = new Set(paidSubscriptions.map((s) => s.userId?._id?.toString())).size;
-  const uniqueCourses = new Set(paidSubscriptions.map((s) => s.courseId?._id?.toString())).size;
+  const uniqueUsers = new Set(completedPurchases.map((s) => s.userId?._id?.toString())).size;
+  const uniqueCourses = new Set(completedPurchases.map((s) => s.courseId?._id?.toString())).size;
+
+  console.log("Admin data fetched successfully");
 
   return NextResponse.json({
-    subscriptions,
+    subscriptions: purchases,
     totalRevenue,
     totalSales,
     transactions,
     overview: {
-      totalSubscriptions: subscriptions.length,
-      paidSubscriptions: paidSubscriptions.length,
+      totalSubscriptions: purchases.length,
+      paidSubscriptions: completedPurchases.length,
       revenue,
       uniqueUsers,
       uniqueCourses,
