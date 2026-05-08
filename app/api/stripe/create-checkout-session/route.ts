@@ -83,8 +83,8 @@ export async function POST(request: Request) {
         },
       ],
       mode: "payment",
-      success_url: `${appUrl}/course/${courseId}?success=true`,
-      cancel_url: `${appUrl}/course/${courseId}?canceled=true`,
+      success_url: `${appUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/courses`,
       metadata: {
         userId: String(userId),
         courseId: String(courseId),

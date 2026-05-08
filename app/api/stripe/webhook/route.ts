@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import connectDB from "@/lib/db";
-import User from "@/models/User";
-import Purchase from "@/models/Purchase";
+import { finalizePaidCheckoutSession } from "@/lib/stripe-purchase";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -47,84 +45,34 @@ export async function POST(req: Request) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const userId = session.metadata?.userId;
-    const courseId = session.metadata?.courseId;
-    const paymentIntentId = session.payment_intent as string;
-    const stripeSessionId = session.id;
-    const amount = session.amount_total;
+    console.log("Stripe webhook: checkout.session.completed", {
+      sessionId: session.id,
+      paymentStatus: session.payment_status,
+    });
 
-    console.log("USER:", userId);
-    console.log("COURSE:", courseId);
-    console.log("PAYMENT INTENT:", paymentIntentId);
-
-    if (!userId || !courseId || !paymentIntentId || !stripeSessionId) {
-      console.error("Missing transaction data");
-      return NextResponse.json(
-        { error: "Missing transaction data" },
-        { status: 400 }
-      );
+    if (session.payment_status !== "paid") {
+      console.log("Stripe webhook: session not paid, skipping unlock", {
+        sessionId: session.id,
+        paymentStatus: session.payment_status,
+      });
+      return NextResponse.json({ received: true, skipped: true });
     }
 
     try {
-      await connectDB();
-
-      // Prevent duplicate purchases
-      const existingPurchase = await Purchase.findOne({
-        userId,
-        courseId,
-      });
-
-      if (existingPurchase) {
-        console.log("Duplicate purchase prevented:", { userId, courseId });
-        return NextResponse.json({ received: true, duplicate: true });
+      const processed = await finalizePaidCheckoutSession(session);
+      if (!processed.ok) {
+        console.error("Stripe webhook: finalize failed", {
+          sessionId: session.id,
+          error: processed.error,
+        });
+        return NextResponse.json({ error: processed.error }, { status: 500 });
       }
 
-      // Save purchase in MongoDB
-      await Purchase.create({
-        userId,
-        courseId,
-        stripePaymentIntentId: paymentIntentId,
-        stripeSessionId: stripeSessionId,
-        amount: amount ? amount / 100 : 0,
-        currency: session.currency || "usd",
-        status: "completed",
-        purchasedAt: new Date(),
+      console.log("Stripe webhook: finalize success", {
+        sessionId: session.id,
+        duplicate: processed.duplicate ?? false,
+        purchaseId: processed.purchaseId,
       });
-
-      // Unlock course for user
-      await User.findByIdAndUpdate(userId, {
-        $addToSet: {
-          purchasedCourses: courseId,
-        },
-      });
-
-      const updatedUser = await User.findById(userId).select("purchasedCourses");
-      const hasPurchasedCourse = updatedUser?.purchasedCourses?.some(
-        (id: string | unknown) => String(id) === String(courseId)
-      );
-
-      if (!updatedUser || !hasPurchasedCourse) {
-        console.error("Stripe Webhook: Failed to verify course purchase on user");
-        return NextResponse.json(
-          { error: "Failed to verify purchase" },
-          { status: 500 }
-        );
-      }
-
-      const savedPurchase = await Purchase.findOne({ stripeSessionId })
-        .select("_id userId courseId stripePaymentIntentId stripeSessionId amount status purchasedAt")
-        .lean();
-
-      if (!savedPurchase) {
-        console.error("Stripe Webhook: Failed to verify saved purchase");
-        return NextResponse.json(
-          { error: "Failed to verify purchase" },
-          { status: 500 }
-        );
-      }
-
-      console.log("Purchase saved successfully:", savedPurchase);
-      console.log("Course successfully added to user");
     } catch (err: unknown) {
       console.error(
         "Stripe Webhook: Database operation failed:",
