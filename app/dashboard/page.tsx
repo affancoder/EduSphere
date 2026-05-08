@@ -237,6 +237,11 @@ export default function DashboardPage() {
               <p className="text-text-muted text-sm">Last login: {user?.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "First time logging in"}</p>
             </div>
             <div className="flex items-center gap-4">
+              {user?.role === "admin" && (
+                <Link href="/admin/dashboard">
+                  <GoldButton variant="ghost">Admin Dashboard</GoldButton>
+                </Link>
+              )}
               <Link href="/settings">
                 <GoldButton variant="ghost">
                   <Settings className="w-4 h-4" />
