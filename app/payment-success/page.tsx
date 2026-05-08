@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -9,7 +9,7 @@ import GoldButton from "@/components/ui/GoldButton";
 
 type VerifyState = "verifying" | "success" | "error";
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
@@ -96,5 +96,31 @@ export default function PaymentSuccessPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col bg-background">
+          <Navbar />
+          <main className="flex-1 container mx-auto px-6 pt-32 pb-20 flex items-center justify-center">
+            <Card className="w-full max-w-xl p-10 bg-surface border-border-gold">
+              <h1 className="font-display text-4xl text-text-primary mb-3">
+                Payment <span className="text-gold italic">Status</span>
+              </h1>
+              <p className="text-text-muted mb-8">Loading payment details...</p>
+              <GoldButton variant="ghost" disabled>
+                Loading...
+              </GoldButton>
+            </Card>
+          </main>
+          <Footer />
+        </div>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
