@@ -62,6 +62,7 @@ export default function CoursePage() {
   const hasPurchasedCourse = user?.purchasedCourses?.some(
     (id) => String(id) === courseId
   ) ?? false;
+  const hasAccess = access?.category !== "premium" || access?.allowed || hasPurchasedCourse;
 
   useEffect(() => {
     const fetchCourseData = async () => {
@@ -227,8 +228,8 @@ export default function CoursePage() {
     );
   }
 
-  if (access?.category === "premium" && !hasPurchasedCourse) {
-    if (!hasPurchasedCourse) {
+  if (access?.category === "premium" && !hasAccess) {
+    if (!hasAccess) {
       return (
         <div className="min-h-screen flex flex-col bg-background">
           <Navbar />

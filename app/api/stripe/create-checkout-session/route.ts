@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import connectDB from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 import Course from "@/models/Course";
+import Purchase from "@/models/Purchase";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -42,6 +43,19 @@ export async function POST(request: Request) {
     const course = await Course.findById(courseId).lean();
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
+    }
+
+    const existingPurchase = await Purchase.findOne({
+      userId,
+      courseId,
+      status: "completed",
+    }).lean();
+
+    if (existingPurchase) {
+      return NextResponse.json(
+        { error: "Course already purchased", alreadyPurchased: true },
+        { status: 409 }
+      );
     }
 
     const amount = Math.round((course.price ?? 0) * 100);

@@ -5,8 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 type Subscription = {
   _id: string;
   amount: number;
-  status: "pending" | "paid" | "failed";
-  createdAt: string;
+  status: "pending" | "completed" | "failed" | "refunded";
+  purchasedAt?: string;
+  createdAt?: string;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
   userId?: { _id: string; name: string; email: string };
   courseId?: { _id: string; title: string };
 };
@@ -99,8 +102,9 @@ export default function AdminSubscriptionsPage() {
         >
           <option value="">All status</option>
           <option value="pending">pending</option>
-          <option value="paid">paid</option>
+          <option value="completed">completed</option>
           <option value="failed">failed</option>
+          <option value="refunded">refunded</option>
         </select>
       </div>
 
@@ -111,8 +115,9 @@ export default function AdminSubscriptionsPage() {
               <th className="px-4 py-3">User</th>
               <th className="px-4 py-3">Course</th>
               <th className="px-4 py-3">Amount</th>
+              <th className="px-4 py-3">Stripe IDs</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Created</th>
+              <th className="px-4 py-3">Purchased</th>
             </tr>
           </thead>
           <tbody>
@@ -124,9 +129,17 @@ export default function AdminSubscriptionsPage() {
                 </td>
                 <td className="px-4 py-3">{subscription.courseId?.title ?? "-"}</td>
                 <td className="px-4 py-3">Rs. {subscription.amount}</td>
+                <td className="px-4 py-3 text-xs text-white/70">
+                  <p>{subscription.stripeSessionId ?? "-"}</p>
+                  <p className="mt-1">{subscription.stripePaymentIntentId ?? "-"}</p>
+                </td>
                 <td className="px-4 py-3">{subscription.status}</td>
                 <td className="px-4 py-3">
-                  {new Date(subscription.createdAt).toLocaleString()}
+                  {subscription.purchasedAt
+                    ? new Date(subscription.purchasedAt).toLocaleString()
+                    : subscription.createdAt
+                      ? new Date(subscription.createdAt).toLocaleString()
+                      : "-"}
                 </td>
               </tr>
             ))}
